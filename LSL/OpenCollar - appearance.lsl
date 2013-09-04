@@ -33,7 +33,7 @@ string UNTICKED = "( )";
 
 string APPLOCK = "Lock Appearance";
 integer g_iAppLock = FALSE;
-string g_sAppLockToken = "Appearance_Lock";
+string g_sAppLockToken = "AppLock";
 
 //MESSAGE MAP
 integer COMMAND_NOAUTH = 0;
@@ -73,7 +73,7 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-//string UPMENU = "â†‘";//when your menu hears this, give the parent menu
+//string UPMENU = "↑";//when your menu hears this, give the parent menu
 string UPMENU = "^";
 
 key g_kWearer;
@@ -86,55 +86,22 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
     return kID;
 } 
 
-integer GetOwnerChannel(key kOwner, integer iOffset)
-{
-    integer iChan = (integer)("0x"+llGetSubString((string)kOwner,2,7)) + iOffset;
-    if (iChan>0)
-    {
-        iChan=iChan*(-1);
-    }
-    if (iChan > -10000)
-    {
-        iChan -= 30000;
-    }
-    return iChan;
-}
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else if (llGetAgentSize(kID) != ZERO_VECTOR)
-    {
+    } else {
         llInstantMessage(kID,sMsg);
-        if (iAlsoNotifyWearer)
-        {
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
-    }
-    else // remote request
-    {
-        llRegionSayTo(kID, GetOwnerChannel(g_kWearer, 1111), sMsg);
-    }
+    }    
 }
 
 Debug(string sStr)
 {
     //llOwnerSay(llGetScriptName() + ": " + sStr);
 }
-string GetScriptID()
-{
-    // strip away "OpenCollar - " leaving the script's individual name
-    list parts = llParseString2List(llGetScriptName(), ["-"], []);
-    return llStringTrim(llList2String(parts, 1), STRING_TRIM) + "_";
-}
-string PeelToken(string in, integer slot)
-{
-    integer i = llSubStringIndex(in, "_");
-    if (!slot) return llGetSubString(in, 0, i);
-    return llGetSubString(in, i + 1, -1);
-}
+
 integer MinMaxUnscaled(vector vSize, float fScale)
 {
     if (fScale < 1.0)
@@ -187,7 +154,6 @@ Store_StartScaleLoop()
     g_lPrimStartSizes = [];
     integer iPrimIndex;
     vector vPrimScale;
-    vector vPrimPosit;
     list lPrimParams;
     if (llGetNumberOfPrims()<2) 
     {
@@ -199,9 +165,7 @@ Store_StartScaleLoop()
         for (iPrimIndex = 1; iPrimIndex <= llGetNumberOfPrims(); iPrimIndex++ )
         {
             lPrimParams = llGetLinkPrimitiveParams( iPrimIndex, [PRIM_SIZE, PRIM_POSITION]);
-            vPrimScale=llList2Vector(lPrimParams,0);
-            vPrimPosit=(llList2Vector(lPrimParams,1)-llGetRootPosition())/llGetRootRotation();
-            g_lPrimStartSizes += [vPrimScale,vPrimPosit];
+            g_lPrimStartSizes += lPrimParams;
         }
     }
     g_iScaleFactor = 100;
@@ -261,14 +225,14 @@ ScalePrimLoop(integer iScale, integer iRezSize, key kAV)
         {
 //            lPrimParams = llGetLinkPrimitiveParams(iPrimIndex, [PRIM_SIZE, PRIM_POSITION]);
             vPrimScale = fScale * llList2Vector(g_lPrimStartSizes, (iPrimIndex - 1)*2);
-            vPrimPos = fScale * llList2Vector(g_lPrimStartSizes, (iPrimIndex - 1)*2+1);
+            vPrimPos = fScale * (llList2Vector(g_lPrimStartSizes, (iPrimIndex - 1)*2+1) - llGetPos());
             if (iPrimIndex == 1) 
             {
                 llSetLinkPrimitiveParamsFast(iPrimIndex, [PRIM_SIZE, vPrimScale]);
             }
             else 
             {
-                llSetLinkPrimitiveParamsFast(iPrimIndex, [PRIM_SIZE, vPrimScale, PRIM_POSITION, vPrimPos]);
+                llSetLinkPrimitiveParamsFast(iPrimIndex, [PRIM_SIZE, vPrimScale, PRIM_POSITION, vPrimPos/llGetRootRotation()]);
             }
         }
         g_iScaleFactor = iScale;
@@ -388,6 +352,11 @@ DoMenu(key kAv, integer iAuth)
     {
         g_lMenuIDs = llListReplaceList(g_lMenuIDs, lAddMe, iMenuIndex, iMenuIndex + g_iMenuStride - 1);    
     }    
+}
+
+string GetDBPrefix()
+{//get db prefix from list in object desc
+    return llList2String(llParseString2List(llGetObjectDesc(), ["~"], []), 2);
 }
 
 default
@@ -589,27 +558,27 @@ default
                     }
                     else if (llGetAttached())
                     {
-                        if (sMessage == "forward")
+                        if (sMessage == "left")
                         {
                             AdjustPos(<g_fNudge, 0, 0>);
                         }
-                        else if (sMessage == "left")
+                        else if (sMessage == "up")
                         {
                             AdjustPos(<0, g_fNudge, 0>);                
                         }
-                        else if (sMessage == "up")
+                        else if (sMessage == "forward")
                         {
                             AdjustPos(<0, 0, g_fNudge>);                
                         }            
-                        else if (sMessage == "backward")
+                        else if (sMessage == "right")
                         {
                             AdjustPos(<-g_fNudge, 0, 0>);                
                         }            
-                        else if (sMessage == "right")
+                        else if (sMessage == "down")
                         {
                             AdjustPos(<0, -g_fNudge, 0>);                    
                         }            
-                        else if (sMessage == "down")
+                        else if (sMessage == "backward")
                         {
                             AdjustPos(<0, 0, -g_fNudge>);                
                         }                            
@@ -641,29 +610,29 @@ default
                     }
                     else if (llGetAttached())
                     {
-                        if (sMessage == "tilt right") // was tilt up
+                        if (sMessage == "tilt up")
                         {
                             AdjustRot(<g_fRotNudge, 0, 0>);
                         }
-                        else if (sMessage == "tilt up") // was right
+                        else if (sMessage == "right")
                         {
-                            AdjustRot(<0, g_fRotNudge, 0>);             
+                            AdjustRot(<0, g_fRotNudge, 0>);                
                         }
-                        else if (sMessage == "right") // was tilt left
+                        else if (sMessage == "tilt left")
                         {
-                            AdjustRot(<0, 0, g_fRotNudge>);           
+                            AdjustRot(<0, 0, g_fRotNudge>);                
                         }            
-                        else if (sMessage == "tilt left") // was tilt down
+                        else if (sMessage == "tilt down")
                         {
-                            AdjustRot(<-g_fRotNudge, 0, 0>);              
+                            AdjustRot(<-g_fRotNudge, 0, 0>);                
                         }            
-                        else if (sMessage == "tilt down") // was left
+                        else if (sMessage == "left")
                         {
-                            AdjustRot(<0, -g_fRotNudge, 0>);              
+                            AdjustRot(<0, -g_fRotNudge, 0>);                    
                         }            
-                        else if (sMessage == "left") // was tilt right
+                        else if (sMessage == "tilt right")
                         {
-                            AdjustRot(<0, 0, -g_fRotNudge>);            
+                            AdjustRot(<0, 0, -g_fRotNudge>);                
                         }                        
                     }
                     else

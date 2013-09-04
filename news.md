@@ -1,16 +1,25 @@
-Issue: 20130831.3
+# OpenCollar 3.7 is here! - 20111017.1
 
-OpenCollar Dev/Beta/RC 3.920
+Hi all.  A few things to know about this update
 
-Thank you for installing a beta version and helping us improve the collar. This version is based in it's entirety on OpenCollar Evolution source, in all it's glory and with all the new challenges it brings.
+1. There is no more web database.  Unfortunately the price of our hosting is 
+going up more than we can manage right now.  I've written [an FAQ] [1] giving
+more details.
 
-High priority mission goals are to test the settings features (evolution defaults), try the new interface for attachments and learn how to regain full integration for Sub AO and Hud.
+2. OpenCollar is now modular.  You only have to run the scripts you need, so
+you can save lag on the sims you visit.  If you run the updater and find you're
+missing a feature that you used to have, you just need to run it again and make
+sure you select that bundle.
 
-Medium priority mission goals are grooming the appearance script which still has pre-evolution artefacts and testing and exploring the touch feature.
+3. There's currently a [bug] (https://jira.secondlife.com/browse/SVC-7321) in
+LL's code that prevents some full perms items from transferring cleanly with
+llGiveInventory and llRemoteLoadScriptPin.  You might see errors relating to
+this on update.  There is supposed to be a fix currently in the regions on the
+"Magnum" release channel.  
 
-Low priority mission goals are finding solutions and/or new ideas for the dying subspy plugin and restoring compatibility for the Real Leash and Cage Home plugins.
 
-We will need your help to groom this one into a full release state and have been looking forward to make something happen again together as a community. Let's do it!
+Thank you!
 
-http://www.opencollar.at/
-https://github.com/OpenCollar/OpenCollarUpdater
+Nirea and Athaliah
+
+[1]: https://github.com/nirea/ocupdater/blob/master/docs/FAQ%20on%20OpenCollar%20Database%20Retirement.md 

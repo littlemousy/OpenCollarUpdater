@@ -1,4 +1,4 @@
-﻿//OpenCollar - rlvtp
+//OpenCollar - rlvtp
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 
 //3.004 - adding "accepttp" support.  No button, just automatically turned on for owner.
@@ -8,11 +8,12 @@ key g_kLMID;//store the request id here when we look up  a LM
 
 key kMenuID;
 key lmkMenuID;
-string CTYPE = "collar";
+
 list g_lOwners;
 
 string g_sParentMenu = "RLV";
 string g_sSubMenu = "Map/TP";
+string g_sDBToken = "rlvtp";
 
 string g_sLatestRLVersionSupport = "1.15.1"; //the version which brings the latest used feature to check against
 string g_sDetectedRLVersion;
@@ -93,24 +94,18 @@ integer DIALOG_TIMEOUT = -9002;
 
 string UPMENU = "^";
 //string MORE = ">";
-string g_sScript;
 
 Debug(string sMsg)
 {
     //llOwnerSay(llGetScriptName() + ": " + sMsg);
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -128,7 +123,7 @@ Menu(key kID, integer iAuth)
 {
     if (!g_iRLVOn)
     {
-        Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+        Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
         llMessageLinked(LINK_SET, iAuth, "menu RLV", kID);
         return;
     }
@@ -257,15 +252,14 @@ UpdateSettings()
 
 SaveSettings()
 {
-    string token = g_sScript + "List";
     //save to DB
     if (llGetListLength(g_lSettings)>0)
     {
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, token + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
     }
     else
     {
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, token, NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     }
 }
 
@@ -274,7 +268,7 @@ ClearSettings()
     //clear settings list
     g_lSettings = [];
     //remove tpsettings from DB... now done by httpdb itself
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     //main RLV script will take care of sending @clear to viewer
     //avoid race conditions
     llSleep(1.0);
@@ -283,7 +277,7 @@ ClearSettings()
 integer UserCommand(integer iNum, string sStr, key kID)
 {
     if (iNum < COMMAND_OWNER || iNum > COMMAND_WEARER) return FALSE;
-    if (sStr == "runaway" && (kID == g_kWearer || iNum == COMMAND_WEARER))
+    if ((sStr == "reset" || sStr == "runaway") && (kID == g_kWearer || iNum == COMMAND_WEARER))
     {   //clear db, reset script
         //llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
         //llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sExToken, NULL_KEY);
@@ -315,7 +309,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
         }
         if (!found)
         {
-            Notify(kID,"The landmark '"+llList2String(lParams, 1)+"' has not been found in the " + CTYPE + " of "+llKey2Name(g_kWearer)+".",FALSE);
+            Notify(kID,"The landmark '"+llList2String(lParams, 1)+"' has not been found in the collar of "+llKey2Name(g_kWearer)+".",FALSE);
         }
     }
     else
@@ -391,7 +385,7 @@ default
     state_entry()
     {
         g_kWearer = llGetOwner();
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
+
         //llSleep(1.0);
         //llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
         //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, g_sDBToken, NULL_KEY);
@@ -413,14 +407,13 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if (sToken == g_sScript + "List")
+            if (sToken == g_sDBToken)
             {
                 //throw away first element
                 //everything else is real settings (should be even number)
                 g_lSettings = llParseString2List(sValue, [","], []);
                 UpdateSettings();
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
         }
         else if (iNum == RLV_REFRESH)
         {

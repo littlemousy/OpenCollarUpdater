@@ -80,6 +80,8 @@ string sPrompt;//Nan: why is this global?
 string g_sFolderType; //what to do with those folders
 string g_sCurrentFolder;
 
+string g_sDBToken = "folders";
+
 list g_lOutfit; //saved folder list
 list g_lToCheck; //stack of folders to check, used for subfolder tree search
 
@@ -88,7 +90,6 @@ list g_lSearchList; //list of folders to search
 integer g_iLastFolderState;
 
 key g_kWearer;
-string g_sScript;
 
 
 Debug(string sMsg)
@@ -96,20 +97,20 @@ Debug(string sMsg)
     //llOwnerSay(llGetScriptName() + ": " + sMsg);
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) 
 {
-    if (kID == g_kWearer)
+    if (kID == g_kWearer) 
     {
         llOwnerSay(sMsg);
-    }
-    else
+    } 
+    else 
     {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
+        llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) 
         {
             llOwnerSay(sMsg);
         }
-    }
+    }    
 }
 
 ParentFolder() {
@@ -126,10 +127,10 @@ ParentFolder() {
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
     key kID = llGenerateKey();
-    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|"
-        + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
+    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
-}
+} 
 
 QueryFolders(string sType)
 {
@@ -137,7 +138,7 @@ QueryFolders(string sType)
     g_iFolderRLV = 9999 + llRound(llFrand(9999999.0));
     g_iListener = llListen(g_iFolderRLV, "", llGetOwner(), "");
     llSetTimerEvent(g_iTimeOut);
-    llMessageLinked(LINK_SET, RLV_CMD, "getinvworn:"+g_sCurrentFolder+"=" + (string)g_iFolderRLV, NULL_KEY);
+    llMessageLinked(LINK_SET, RLV_CMD, "getinvworn:"+g_sCurrentFolder+"=" + (string)g_iFolderRLV, NULL_KEY);                     
 }
 
 string lockFolderButton(integer iLockState, integer iLockNum, integer iAuth)
@@ -169,10 +170,10 @@ RootActionsMenu(key kAv, integer iAuth)
 {
     list lActions = [lockUnsharedButton(0, iAuth), lockUnsharedButton(1, iAuth), "Save", "Restore"];
     string sPrompt = "You are at the #RLV shared root.\nFrom here, you can restrict wearing or removing not shared items, you can also save the list of worn shared folders or make the currently saved list be worn again.\n\nWhat do you want to do?";
-    g_kRootActionsID = Dialog(kAv, sPrompt, lActions, [UPMENU], 0, iAuth);
+    g_kRootActionsID = Dialog(kAv, sPrompt, lActions, [UPMENU], 0, iAuth);    
 }
-
-
+    
+    
 FolderActionsMenu(integer iState, key kAv, integer iAuth)
 {
     integer iStateThis = iState / 10;
@@ -181,8 +182,8 @@ FolderActionsMenu(integer iState, key kAv, integer iAuth)
     if (!iStateSub) g_sFolderType = "actions_sub";
     else g_sFolderType = "actions";
     list lActions;
-
-    if (g_sCurrentFolder != "")
+    
+    if (g_sCurrentFolder != "") 
     {
         integer iIndex = llListFindList(g_lFolderLocks, [g_sCurrentFolder]);
         integer iLock;
@@ -190,7 +191,7 @@ FolderActionsMenu(integer iState, key kAv, integer iAuth)
         {
             iLock = llList2Integer(g_lFolderLocks, iIndex+1);
         }
-
+    
         if ( iStateThis == 1 || iStateThis == 2) // there are items that can be added in current folder
             lActions += [REPLACE, ADD, lockFolderButton(iLock, 0, iAuth)];
         if ( iStateThis == 2 || iStateThis == 3) // there are items that can be removed
@@ -204,10 +205,10 @@ FolderActionsMenu(integer iState, key kAv, integer iAuth)
     if (g_sCurrentFolder == "") sPrompt += "root";
     else sPrompt += g_sCurrentFolder;
     sPrompt += ".\n";
-    sPrompt += "What do you want to do?\n\n";
-
+    sPrompt += "What do you want to do?\n\n"; 
+    
     g_kActionsID = Dialog(kAv, sPrompt, lActions, [UPMENU], 0, iAuth);
-}
+}    
 
 string folderIcon(integer iState)
 {
@@ -219,8 +220,8 @@ string folderIcon(integer iState)
     else if (iStateThis==2) sOut += "◩";
     else if (iStateThis==3) sOut += "◼";
     else sOut += " ";
-    //    sOut += "/";
-    if (iStateSub==0) sOut += "⬚"; //▪";
+//    sOut += "/";
+    if (iStateSub==0) sOut += "⬚";//▪";
     else if (iStateSub==1) sOut += "◻";
     else if (iStateSub==2) sOut += "◩";
     else if (iStateSub==3) sOut += "◼";
@@ -247,7 +248,7 @@ string FolderFromButton(string sButton)
 {
     return llToLower(llGetSubString(sButton, 2, -1));
 }
-
+    
 updateFolderLocks(string sFolder, integer iAdd, integer iRem)
 { // adds and removes locks for sFolder, which implies saving to central settings and triggering a RLV command (dolockFolder)
     integer iLock;
@@ -273,10 +274,10 @@ updateFolderLocks(string sFolder, integer iAdd, integer iRem)
         iIndex = llGetListLength(g_lFolderLocks)-2;
         doLockFolder(iIndex);
     }
-    if ([] != g_lFolderLocks) llMessageLinked(LINK_SET, LM_SETTING_SAVE,  g_sScript + "Locks=" + llDumpList2String(g_lFolderLocks, ","), NULL_KEY);
-    else llMessageLinked(LINK_SET, LM_SETTING_DELETE,  g_sScript + "Locks", NULL_KEY);
+    if ([] != g_lFolderLocks) llMessageLinked(LINK_SET, LM_SETTING_SAVE,  "FolderLocks=" + llDumpList2String(g_lFolderLocks, ","), NULL_KEY);
+    else llMessageLinked(LINK_SET, LM_SETTING_DELETE,  "FolderLocks", NULL_KEY);
 }
-
+    
 doLockFolder(integer iIndex)
 { // sends command to the viewer to update all locks concerning folder #iIndex
     string sFolder = llList2String(g_lFolderLocks, iIndex);
@@ -297,19 +298,19 @@ doLockFolder(integer iIndex)
     if ((iLock >> 6) & 1)  sRlvCom += "n"; else sRlvCom += "y";
     sRlvCom += ",detachallthis_except:"+sFolder+"=";
     if ((iLock >> 7) & 1)  sRlvCom += "n"; else sRlvCom += "y";
-    //    llOwnerSay(sRlvCom);
+//    llOwnerSay(sRlvCom);
     llMessageLinked(LINK_SET, RLV_CMD,  sRlvCom, NULL_KEY);
 }
 
 
 updateUnsharedLocks(integer iAdd, integer iRem)
 { // adds and removes locks for unshared items, which implies saving to central settings and triggering a RLV command (dolockUnshared)
-    g_iUnsharedLocks = ((g_iUnsharedLocks | iAdd) & ~iRem);
+    g_iUnsharedLocks = ((g_iUnsharedLocks | iAdd) & ~iRem);   
     doLockUnshared();
-    if (g_iUnsharedLocks) llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "Unshared=" + (string) g_iUnsharedLocks, NULL_KEY);
-    else llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "Unshared", NULL_KEY);
+    if (g_iUnsharedLocks) llMessageLinked(LINK_SET, LM_SETTING_SAVE,  "UnsharedLocks=" + (string) g_iUnsharedLocks, NULL_KEY);
+    else llMessageLinked(LINK_SET, LM_SETTING_DELETE,  "UnsharedLocks", NULL_KEY);
 }
-
+    
 doLockUnshared()
 { // sends command to the viewer to update all locks concerning unshared items
     string sRlvCom = "unsharedunwear=";
@@ -327,7 +328,7 @@ FolderBrowseMenu(string sStr)
     string sPrompt = "Current folder is ";
     if (g_sCurrentFolder == "")
     {
-        sPrompt += "root";
+    sPrompt += "root";
     }
     else sPrompt += g_sCurrentFolder;
     sPrompt += ".\n";
@@ -356,7 +357,7 @@ FolderBrowseMenu(string sStr)
         lItem=llParseString2List(llList2String(sData,i),["|"],[]);
         string sFolder = llList2String(lItem,0);
         iWorn=llList2Integer(lItem,1);
-        if (iWorn != 0)
+        if (iWorn != 0)        
         {
             lFolders += [folderIcon(iWorn) + sFolder];
         }
@@ -364,7 +365,7 @@ FolderBrowseMenu(string sStr)
     sPrompt += "- Click "+ACTIONS_CURRENT+" to manage this folder content.\n- Click one of the subfolders to browse it.\n";
     if (g_sCurrentFolder!="") {sPrompt += "- Click "+PARENT+" to browse parent folder."; lUtilityButtons += [PARENT];}
     sPrompt += "\n- Click "+UPMENU+" to go back to "+g_sParentMenu+".\n\n";
-    g_kBrowseID = Dialog(g_kAsyncMenuUser, sPrompt, lFolders, lUtilityButtons, g_iPage, g_iAsyncMenuAuth);
+    g_kBrowseID = Dialog(g_kAsyncMenuUser, sPrompt, lFolders, lUtilityButtons, g_iPage, g_iAsyncMenuAuth);    
 }
 
 SaveFolder(string sStr)
@@ -410,9 +411,9 @@ handleMultiSearch()
     else if (pref1 == "-") g_sFolderType = "searchdetach";
     else jump next;  // operator was omitted, then repeat last action
 
-    if (pref2 == "++" || pref2 == "--" || pref2 == "&&")
+    if (pref2 == "++" || pref2 == "--" || pref2 == "&&") 
     {
-        g_sFolderType += "all";
+	g_sFolderType += "all";
         sItem = llToLower(llGetSubString(sItem,2,-1));
     }
     else sItem = llToLower(llGetSubString(sItem,1,-1));
@@ -426,7 +427,7 @@ handleMultiSearch()
     g_iListener = llListen(g_iFolderRLV, "", llGetOwner(), "");
     //start timer
     llSetTimerEvent(g_iTimeOut);
-    llMessageLinked(LINK_SET, RLV_CMD,  "findfolder:"+sItem+"="+(string)g_iFolderRLV, NULL_KEY);
+    llMessageLinked(LINK_SET, RLV_CMD,  "findfolder:"+sItem+"="+(string)g_iFolderRLV, NULL_KEY);       
 }
 
 // set a dialog to be requested after the next viewer answer
@@ -446,7 +447,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
     if (llToLower(sStr) == "#rlv" || sStr == "menu Browse #RLV")
     {
         g_sCurrentFolder = "";
-        QueryFolders("browse");
+        QueryFolders("browse"); 
         SetAsyncMenu(kID, iNum);
     }
     else if (sStr=="save" /*|| sStr=="menu Save"*/)
@@ -481,7 +482,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
         else return TRUE;
         if (llList2String(lArgs,1)=="y") updateUnsharedLocks(0, val);
         else if (llList2String(lArgs,1)=="n") updateUnsharedLocks(val, 0);
-        else return TRUE;
+        else return TRUE;            
     }
     return TRUE;
 }
@@ -490,21 +491,20 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
-        g_kWearer = llGetOwner();
+        g_kWearer = llGetOwner();         
         integer i;
-        for (i=0;i < llGetListLength(g_lChildren);i++)
+        for (i=0;i < llGetListLength(g_lChildren);i++)              
         {
             llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + llList2String(g_lChildren,i), NULL_KEY);
         }
     }
-
+    
     link_message(integer iSender, integer iNum, string sStr, key kID)
     {
         if (iNum == MENUNAME_REQUEST && sStr == g_sParentMenu)
         {
             integer i;
-            for (i=0;i < llGetListLength(g_lChildren);i++)
+            for (i=0;i < llGetListLength(g_lChildren);i++)              
             {
                 llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + llList2String(g_lChildren,i), NULL_KEY);
             }
@@ -515,9 +515,9 @@ default
             if (kID == g_kRootActionsID)
             {
                 list lMenuParams = llParseString2List(sStr, ["|"], []);
-                key kAv = (key)llList2String(lMenuParams, 0);
-                string sMessage = llList2String(lMenuParams, 1);
-                integer iAuth = (integer)llList2String(lMenuParams, 3);
+                key kAv = (key)llList2String(lMenuParams, 0);          
+                string sMessage = llList2String(lMenuParams, 1);                                         
+                integer iAuth = (integer)llList2String(lMenuParams, 3);                                         
                 if (sMessage == UPMENU) {SetAsyncMenu(kAv, iAuth); QueryFolders("browse");}
                 else if (sMessage == "Save") UserCommand(iAuth, "save", kAv);
                 else if (sMessage == "Restore") UserCommand(iAuth, "restore", kAv);
@@ -544,19 +544,19 @@ default
                     }
                 }
                 RootActionsMenu(kAv, iAuth);
-            }
+            }            
             else if (kID == g_kBrowseID)
             {
                 list lMenuParams = llParseString2List(sStr, ["|"], []);
-                key kAv = (key)llList2String(lMenuParams, 0);
-                string sMessage = llList2String(lMenuParams, 1);
-                g_iPage = (integer)llList2String(lMenuParams, 2);
-                integer iAuth = (integer)llList2String(lMenuParams, 3);
-
+                key kAv = (key)llList2String(lMenuParams, 0);          
+                string sMessage = llList2String(lMenuParams, 1);                                         
+                g_iPage = (integer)llList2String(lMenuParams, 2);                
+                integer iAuth = (integer)llList2String(lMenuParams, 3);                
+                                
                 if (sMessage == UPMENU)
                 {
                     llMessageLinked(LINK_SET, iAuth, "menu " + g_sParentMenu, kAv);
-                    return;
+                    return;                    
                 }
                 else if (sMessage == ROOT_ACTIONS)
                 {
@@ -585,17 +585,17 @@ default
                     }
                 }
                 g_iPage = 0;
-                SetAsyncMenu(kAv, iAuth);
+                SetAsyncMenu(kAv, iAuth);                
                 QueryFolders("browse");
             }
-
+                    
             else if (kID == g_kActionsID)
             {
                 list lMenuParams = llParseString2List(sStr, ["|"], []);
-                key kAv = (key)llList2String(lMenuParams, 0);
-                string sMessage = llList2String(lMenuParams, 1);
-                integer iAuth = (integer)llList2String(lMenuParams, 3);
-
+                key kAv = (key)llList2String(lMenuParams, 0);          
+                string sMessage = llList2String(lMenuParams, 1);                                         
+                integer iAuth = (integer)llList2String(lMenuParams, 3);                                         
+                
                 if (sMessage == ADD)
                 {
                     llMessageLinked(LINK_SET, RLV_CMD,  "attachover:" + g_sCurrentFolder + "=force", NULL_KEY);
@@ -688,37 +688,32 @@ default
                 }
                 else if (llGetSubString(sMessage, 0, 0) == "(") Notify(kAv, "This action is forbidden at your authentification level.", FALSE);
                 if (sMessage != UPMENU) llSleep(1.0); //time for command to take effect so that we see the result in menu
-                //Return to browse menu
+                //Return to browse menu                
                 if (g_sFolderType == "actions_sub") ParentFolder();
-                SetAsyncMenu(kAv, iAuth);
+                SetAsyncMenu(kAv, iAuth);                
                 QueryFolders("browse");
             }
         }
-        else if (iNum == LM_SETTING_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE || iNum == LM_SETTING_RESPONSE)
         {
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            if (sToken == "FolderLocks")
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "Locks")
-                {
-                    g_lFolderLocks = llParseString2List(sValue, [","], []);
-                    integer iN = llGetListLength(g_lFolderLocks);
-                    integer i;
-                    for (i = 0; i < iN; i += 2) doLockFolder(i);
-                }
-                else if (sToken == "Unshared")
-                {
-                    g_iUnsharedLocks = (integer) sValue;
-                    doLockUnshared();
-                }
+                g_lFolderLocks = llParseString2List(sValue, [","], []);
+                integer iN = llGetListLength(g_lFolderLocks);
+                integer i;
+                for (i = 0; i < iN; i += 2) doLockFolder(i);
+            }
+            else if (sToken == "UnsharedLocks")
+            {
+                g_iUnsharedLocks = (integer) sValue;
+                doLockUnshared();
             }
         }
-    }
-
+    } 
+    
     listen(integer iChan, string sName, key kID, string sMsg)
     {
         llListenRemove(g_iListener);
@@ -748,7 +743,7 @@ default
             }
         }
     }
-
+    
     timer()
     {
         llListenRemove(g_iListener);

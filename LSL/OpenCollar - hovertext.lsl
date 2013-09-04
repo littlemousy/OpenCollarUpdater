@@ -1,4 +1,4 @@
-﻿//OpenCollar - hovertext
+//OpenCollar - hovertext
 
 string g_sParentMenu = "AddOns";
 string g_sFeatureName = "FloatText";
@@ -42,17 +42,12 @@ Debug(string sMsg) {
     //llOwnerSay(llGetScriptName() + " (debug): " + sMsg);
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -95,9 +90,12 @@ HideText() {
 // for storing the link number of the prim where we'll set text.
 integer g_iTextPrim = LINK_THIS;
 
-vector GetTextPrimColor()
-{
-    return llList2Vector(llGetLinkPrimitiveParams(g_iTextPrim, [PRIM_COLOR, ALL_SIDES]), 0) ;
+vector GetTextPrimColor() {
+    //if ( g_iTextPrim == -1 ) {
+        return  ZERO_VECTOR ;
+    //}
+    list params = llGetLinkPrimitiveParams( g_iTextPrim, [PRIM_COLOR, ALL_SIDES] ) ;
+    return llList2Vector( params, 0 ) ;
 }
 
 default {
@@ -190,13 +188,20 @@ default {
                     g_iLastRank = iNum;
                     ShowText(g_sText);
                 }
-            } else if (sStr == "runaway" && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER)) {
+            } else if (sStr == "reset" && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER)) {
                 g_sText = "";
                 HideText();
                 llResetScript();
             }
         } else if (iNum == MENUNAME_REQUEST) {
             llMessageLinked(LINK_ROOT, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sFeatureName, NULL_KEY);
+        } else if (iNum == LM_SETTING_RESPONSE) {
+            lParams = llParseString2List(sStr, ["="], []);
+            string sToken = llList2String(lParams, 0);
+            Debug("sToken: " + sToken);
+            if (sToken == g_sDBToken) {
+                llMessageLinked(LINK_ROOT, LM_SETTING_DELETE, g_sDBToken , NULL_KEY);
+            }
         }
     }
 

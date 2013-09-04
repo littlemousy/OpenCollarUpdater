@@ -1,4 +1,4 @@
-﻿//OpenCollar - leash
+//OpenCollar - leash
 //leash script for the Open Collar Project (c)
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 
@@ -120,8 +120,6 @@ key g_kCmdGiver;
 key g_kLeashedTo = NULL_KEY;
 integer g_bLeashedToAvi;
 integer g_bFollowMode;
-string g_sScript;
-string CTYPE = "collar";
 
 list g_lLengths = ["1", "2", "3", "4", "5", "8","10" , "15", "20", "25", "30"];
 //list g_lPartPoints; // DoLeash function- priority given to last item in list. so if list is ["collar", "handle"], and we've heard from the handle and particles are going there, we'll ignore any responses from "collar"
@@ -163,31 +161,20 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
     return kID;
 } 
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) 
 {
-    if (kID == g_kWearer)
+    if (kID == g_kWearer) 
     {
         llOwnerSay(sMsg);
-    }
-    else
+    } 
+    else 
     {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
+        llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) 
         {
             llOwnerSay(sMsg);
         }
-    }
-}
-
-string Float2String(float in)
-{
-    string out = (string)in;
-    integer i = llSubStringIndex(out, ".");
-    while (~i && llStringLength(llGetSubString(out, i + 2, -1)) && llGetSubString(out, -1, -1) == "0")
-    {
-        out = llGetSubString(out, 0, -2);
-    }
-    return out;
+    }    
 }
 
 integer CheckCommandAuth(key kCmdGiver, integer iAuth)
@@ -200,7 +187,7 @@ integer CheckCommandAuth(key kCmdGiver, integer iAuth)
     if (g_kLeashedTo != NULL_KEY && iAuth > g_iLastRank)
     {
         string sFirstName = GetFirstName(g_sWearer);
-        Notify(kCmdGiver, "Sorry, someone who outranks you on " + g_sWearer +"'s " + CTYPE + " leashed " + sFirstName + " already.", FALSE);
+        Notify(kCmdGiver, "Sorry, someone who outranks you on " + g_sWearer +"'s collar leashed " + sFirstName + " already.", FALSE);
 
         return FALSE;
     }
@@ -264,7 +251,12 @@ SetLength(float fIn)
 LeashTo(key kTarget, key kCmdGiver, integer iAuth, list lPoints)
 {
     // can't leash wearer to self.
-    if (kTarget == g_kWearer) return;
+    if (kTarget == g_kWearer)
+        return;
+    
+    // TODO: why this??  It seems to have something to do with getting commands from objects.
+    if (kTarget == kCmdGiver && llGetOwnerKey(kCmdGiver) == g_kWearer)
+        return;
 
     // Send notices to wearer, leasher, and target
     // Only send notices if Leasher is an AV, as objects normally handle their own messages for such things
@@ -327,6 +319,7 @@ LeashTo(key kTarget, key kCmdGiver, integer iAuth, list lPoints)
             g_bLeashedToAvi = TRUE;
         }
     }
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, TOK_DEST + "=" + (string)kTarget + "," + (string)iAuth + "," + (string)g_bLeashedToAvi + "," + (string)g_bFollowMode, NULL_KEY);
     DoLeash(kTarget, iAuth, lPoints, g_bFollowMode);
     
     // Notify Target how to unleash, only if:
@@ -342,9 +335,13 @@ LeashTo(key kTarget, key kCmdGiver, integer iAuth, list lPoints)
 // Wrapper for DoLeash with notifications
 Follow(key kTarget, key kCmdGiver, integer iAuth)
 {
-    debug("Follow target=" + llList2CSV([kTarget, kCmdGiver, iAuth]));
     // can't leash wearer to self.
-    if (kTarget == g_kWearer) return;
+    if (kTarget == g_kWearer) 
+        return;
+    
+    // TODO: why this??  It seems to have something to do with getting commands from objects.
+    if (kTarget == kCmdGiver && llGetOwnerKey(kCmdGiver) == g_kWearer) 
+        return;
 
     // Send notices to wearer, leasher, and target
     // Only send notices if Leasher is an AV, as objects normally handle their own messages for such things
@@ -377,6 +374,7 @@ Follow(key kTarget, key kCmdGiver, integer iAuth)
             g_bLeashedToAvi = TRUE;
         }
     }
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, TOK_DEST + "=" + (string)kTarget + "," + (string)iAuth + "," + (string)g_bLeashedToAvi + "," + (string)g_bFollowMode, NULL_KEY);
     DoLeash(kTarget, iAuth, [], g_bFollowMode); // sending empty list [] for lPoints
 
     // Notify Target how to unleash, only if:
@@ -422,8 +420,6 @@ DoLeash(key kTarget, integer iAuth, list lPoints, integer bFollowMode)
         llMoveToTarget(g_vPos, 0.7);
     }
     g_iUnixTime = llGetUnixTime();
-    debug("DoLeash: " + g_sScript + TOK_DEST + "=" + (string)kTarget + "," + (string)iAuth + "," + (string)g_bLeashedToAvi + "," + (string)g_bFollowMode);
-    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + TOK_DEST + "=" + (string)kTarget + "," + (string)iAuth + "," + (string)g_bLeashedToAvi + "," + (string)g_bFollowMode, NULL_KEY);
 }
 
 // sets up a sensor callback which will leash / follow / post on chatted target.
@@ -532,6 +528,7 @@ Unleash(key kCmdGiver)
         }
         Notify(g_kWearer, sWearMess, FALSE);
     }
+    
     DoUnleash();
 }
 
@@ -541,7 +538,7 @@ DoUnleash()
     llMessageLinked(LINK_THIS, COMMAND_PARTICLE, "unleash", g_kLeashedTo);
     g_kLeashedTo = NULL_KEY;
     g_iLastRank = COMMAND_EVERYONE;
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + TOK_DEST, "");
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, TOK_DEST, "");
 }
 
 integer KeyIsAv(key id)
@@ -592,31 +589,30 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
         g_kCmdGiver = kMessageID;
         list lParam = llParseString2List(sMessage, [" "], []);
         string sComm = llToLower(llList2String(lParam, 0));
-        string sVal = llToLower(llList2String(lParam, 1));
+        
         if (sMesL == "grab" || sMesL == "leash" || (sMesL == "toggleleash" && NULL_KEY == g_kLeashedTo))
         {
             if (CheckCommandAuth(kMessageID, iAuth)) LeashTo(kMessageID, kMessageID, iAuth, ["handle"]);
         }
         else if(sComm == "follow")
         {
-            debug("Got a follow command");
             if (CheckCommandAuth(kMessageID, iAuth))
             {
-                if (sVal == "" || sVal == "me")
+                string sChattedTarget = llList2String(lParam, 1);
+                if (sMesL == sComm) // no parameters were passed
                 {
                     Follow(kMessageID, kMessageID, iAuth);
                 }       
-                else if ((key)sVal)
+                else if ((key)sChattedTarget)
                 {
-                    Follow((key)sVal, kMessageID, iAuth);
+                    Follow((key)sChattedTarget, kMessageID, iAuth);
                 } 
                 else
                 {
-                    ActOnChatTarget(sVal, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_FOLLOW_CHAT);
+                    ActOnChatTarget(sChattedTarget, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_FOLLOW_CHAT);
                 }
             }
         }
-        else if (sMesL == "runaway" && iAuth == COMMAND_OWNER) Unleash(kMessageID);
         else if (sMesL == "unleash" || sMesL == "unfollow" || (sMesL == "toggleleash" && NULL_KEY != g_kLeashedTo))
         {
             if (CheckCommandAuth(kMessageID, iAuth)) Unleash(kMessageID);
@@ -627,11 +623,11 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
         }
         else if (sMesL == "givepost")
         {
-            llGiveInventory(kMessageID, "Grabby Post");
+            llGiveInventory(kMessageID, "OC_Leash_Post");
         }
         else if (sMesL == "rezpost")
         {
-            llRezObject("Grabby Post", llGetPos() + (<1.0, 0, 0.395> * llGetRot()), ZERO_VECTOR, llEuler2Rot(<0, 0, 0> * DEG_TO_RAD), 0);
+            llRezObject("OC_Leash_Post", llGetPos() + (<1.0, 0, 0.5> * llGetRot()), ZERO_VECTOR, llEuler2Rot(<0, 90, 0> * DEG_TO_RAD), 0);
         }
         else if (sMesL == "yank" && kMessageID == g_kLeashedTo)
         {
@@ -665,7 +661,7 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
             if (g_kWearer == kMessageID)
             {
                 g_iRot = FALSE;
-                llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + TOK_ROT + "=0", "");
+                llMessageLinked(LINK_SET, LM_SETTING_SAVE, TOK_ROT + "=0", "");
             }
             else
             {
@@ -677,14 +673,18 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
             if (g_kWearer == kMessageID)
             {
                 g_iRot = TRUE;
-                llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + TOK_ROT, "");
+                llMessageLinked(LINK_SET, LM_SETTING_DELETE, TOK_ROT, "");
             }
             else
             {
                 Notify(kMessageID,"Only the wearer can change the rotate setting", FALSE);
             }
         }
-        else if(sMesL == "leashmenu" || sMessage == "menu " + BUTTON_SUBMENU)
+        else jump othermenu;
+        if (g_iReturnMenu) LeashMenu(kMessageID, iAuth);
+        return TRUE;
+        @othermenu;
+        if(sMesL == "leashmenu" || sMessage == "menu " + BUTTON_SUBMENU)
         {
             if (CheckCommandAuth(kMessageID, iAuth)) LeashMenu(kMessageID, iAuth);
             else if (sMesL == "menu " + BUTTON_SUBMENU) {llMessageLinked(LINK_SET, iAuth, "menu " + BUTTON_PARENTMENU, kMessageID); return TRUE;}
@@ -692,31 +692,33 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
         else if (sComm == "leashto")
         {
             if (!CheckCommandAuth(kMessageID, iAuth)) return TRUE;
-            if (sVal == "") // no parameters were passed
+
+            string sChattedTarget = llList2String(lParam, 1);
+            if (sMesL == sComm) // no parameters were passed
             {
                 DisplayTargetMenu(kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_LEASH_MENU);
             }       
-            else if((key)sVal)
+            else if((key)sChattedTarget)
             {
                 list lPoints;
                 if (llGetListLength(lParam) > 2) lPoints = llList2List(lParam, 2, -1);
                 //debug("leash target is key");//could be a post, or could be we specified an av key
-                LeashTo((key)sVal, kMessageID, iAuth, lPoints);
+                LeashTo((key)sChattedTarget, kMessageID, iAuth, lPoints);
             }
             else
             {
-                ActOnChatTarget(sVal, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_LEASH_CHAT);
+                ActOnChatTarget(sChattedTarget, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_LEASH_CHAT);
             }
         }
         else if(sComm == "followtarget")
         {
             if (!CheckCommandAuth(kMessageID, iAuth)) return TRUE;
+            
             DisplayTargetMenu(kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_FOLLOW_MENU);
         }
         else if (sComm == "length")
         {
-            float fNewLength = (float)sVal;
-            sVal = Float2String(fNewLength);
+            float fNewLength = (float)llList2String(lParam, 1);
             if(fNewLength > 0.0)
             {
                 //Person holding the leash can always set length.
@@ -724,32 +726,34 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
                 {
                     SetLength(fNewLength);
                     //tell wearer  
-                    Notify(kMessageID, "Leash length set to " + sVal, TRUE);        
-                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + TOK_LENGTH + "=" + sVal, "");
+                    Notify(kMessageID, "Leash length set to " + (string)fNewLength, TRUE);        
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, TOK_LENGTH + "=" + (string)fNewLength, "");
                 }
             }
-            else Notify(kMessageID, "The current leash length is " + Float2String(g_fLength) + "m.", TRUE);
+            else Notify(kMessageID, "The current leash length is " + (string)g_fLength + "m.", TRUE);
         }
         else if (sComm == "post")
         {
+            string sChattedTarget = llList2String(lParam, 1);
             if (!CheckCommandAuth(kMessageID, iAuth)) return TRUE;
 
-            else if (sVal == "") // no parameters were passed
+            else if (sMesL == sComm) // no parameters were passed
             {
                 DisplayTargetMenu(kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_POST_MENU);
             }       
-            else if((key)sVal)
+            else if((key)sChattedTarget)
             {
                 list lPoints;
                 if (llGetListLength(lParam) > 2) lPoints = llList2List(lParam, 2, -1);
                 //debug("leash target is key");//could be a post, or could be we specified an av key
-                LeashTo((key)sVal, kMessageID, iAuth, lPoints);
+                LeashTo((key)sChattedTarget, kMessageID, iAuth, lPoints);
             }
             else
             {
-                ActOnChatTarget(sVal, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_POST_CHAT);
+                ActOnChatTarget(sChattedTarget, kMessageID, iAuth, SENSORMODE_FIND_TARGET_FOR_POST_CHAT);
             }
         }
+        return TRUE;
     }
     else if (iAuth == COMMAND_LEASH_SENSOR)
     {
@@ -762,8 +766,8 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
             llTargetRemove(g_iTargetHandle);
             g_vPos = llList2Vector(llGetObjectDetails(g_kLeashedTo,[OBJECT_POS]),0);
             g_iTargetHandle = llTarget(g_vPos, g_fLength);
-            if (g_vPos != ZERO_VECTOR) llMoveToTarget(g_vPos, 0.7);
         }
+        return TRUE;
     }
     else if (iAuth == COMMAND_EVERYONE)
     {
@@ -783,10 +787,9 @@ integer UserCommand(integer iAuth, string sMessage, key kMessageID)
                 YankTo(kMessageID);
             }
         }
+        return TRUE;
     }
     else return FALSE;
-    if (g_iReturnMenu) LeashMenu(kMessageID, iAuth);
-    return TRUE;
 }
 // ---------------------------------------------
 // ------ IMPLEMENTATION ------
@@ -794,7 +797,6 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         //debug("statentry:"+(string)llGetFreeMemory( ));
         g_kWearer = llGetOwner();
         g_sWearer = llKey2Name(g_kWearer);
@@ -841,32 +843,30 @@ default
         else if (iNum == LM_SETTING_RESPONSE)
         {
             integer iInd = llSubStringIndex(sMessage, "=");
-            string sToken = llGetSubString(sMessage, 0, iInd -1);
-            string sValue = llGetSubString(sMessage, iInd + 1, -1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            string sTOK = llGetSubString(sMessage, 0, iInd -1);
+            string sVAL = llGetSubString(sMessage, iInd + 1, -1);
+            if (sTOK == TOK_DEST)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == TOK_DEST)
+                //we got the last leasher's id and rank from the local settings
+                list lParam = llParseString2List(llGetSubString(sMessage, iInd + 1, -1), [","], []);
+                key kTarget = (key)llList2String(lParam, 0);
+                g_bLeashedToAvi = (integer)llList2String(lParam, 2);
+        g_bFollowMode = (integer)llList2String(lParam, 3);
+                list lPoints;
+                if (g_bLeashedToAvi)
                 {
-                    //we got the last leasher's id and rank from the local settings
-                    list lParam = llParseString2List(llGetSubString(sMessage, iInd + 1, -1), [","], []);
-                    key kTarget = (key)llList2String(lParam, 0);
-                    g_bLeashedToAvi = (integer)llList2String(lParam, 2);
-                    g_bFollowMode = (integer)llList2String(lParam, 3);
-                    list lPoints;
-                    if (g_bLeashedToAvi)
-                    {
-                        lPoints = ["collar", "handle"];
-                    }
-                    // if PostedTo object has vanished, clear out the leash settings
-                    if (!llGetObjectPrimCount(kTarget) && !g_bLeashedToAvi) DoUnleash();
-                    else DoLeash(kTarget, (integer)llList2String(lParam, 1), lPoints, g_bFollowMode);
+                    lPoints = ["collar", "handle"];
                 }
-                else if (sToken == TOK_LENGTH) SetLength((float)sValue);
-                else if (sToken == TOK_ROT) g_iRot = (integer)sValue;
+                DoLeash(kTarget, (integer)llList2String(lParam, 1), lPoints, g_bFollowMode);                
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
+            else if (sTOK == TOK_LENGTH)
+            {
+                SetLength((float)sVAL);
+            }
+            else if (sTOK == TOK_ROT)
+            {
+                g_iRot = (integer)sVAL;
+            }
         }
         else if (iNum == DIALOG_RESPONSE)
         {
@@ -910,7 +910,6 @@ default
             }
             else if (kMessageID == g_kFollowTargetDialogID)
             {
-                debug("Follow from menu=" + sButton);
                 if ((key)sButton)
                 {
                     g_kLeashedTo = (key)sButton;

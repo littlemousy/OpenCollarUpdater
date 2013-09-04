@@ -1,7 +1,8 @@
-﻿//OpenCollar - rlvmisc
+//OpenCollar - rlvmisc
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 string g_sParentMenu = "RLV";
 string g_sSubMenu = "Misc";
+string g_sDBToken = "rlvmisc";
 
 list g_lSettings;//2-strided list in form of [option, param]
 
@@ -16,8 +17,7 @@ list g_lRLVcmds = [
     "viewscript",
     "viewtexture",
     "showhovertexthud",
-    "showhovertextworld",
-    "showhovertext"
+    "showhovertextworld"
         ];
 
 list g_lPrettyCmds = [ //showing menu-friendly command names for each item in g_lRLVcmds
@@ -31,8 +31,7 @@ list g_lPrettyCmds = [ //showing menu-friendly command names for each item in g_
     "Scripts",
     "Textures",
     "Hud",
-    "World",
-    "Title"
+    "World"
         ];
 
 list g_lDescriptions = [ //showing descriptions for commands
@@ -52,8 +51,6 @@ list g_lDescriptions = [ //showing descriptions for commands
 
 string TURNON = "Allow";
 string TURNOFF = "Forbid";
-
-integer FLOATLINK; // hover text link number
 
 key kMenuID;
 
@@ -100,12 +97,6 @@ string UPMENU = "^";
 //string MORE = ">";
 
 key g_kWearer;
-string g_sScript;
-string CTYPE = "collar";
-Debug(string in)
-{
-    //llOwnerSay(in);
-}
 
 Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 {
@@ -115,18 +106,20 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
     }
     else
     {
-        llInstantMessage(kID, sMsg);
+        llInstantMessage(kID,sMsg);
         if (iAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
         }
     }
 }
+
+
 Menu(key kID, integer iAuth)
 {
     if (!g_iRLVOn)
     {
-        Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+        Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
         llMessageLinked(LINK_SET, iAuth, "menu RLV", kID);
         return;
     }
@@ -192,10 +185,7 @@ UpdateSettings()
         {
             sTempRLVSetting=llList2String(g_lSettings, n);
             sTempRLVValue=llList2String(g_lSettings, n + 1);
-            string sLinkKey;
-            if (sTempRLVSetting == "showhovertext") sLinkKey = ":" + (string)llGetLinkKey(FLOATLINK);
-            lNewList += [ sTempRLVSetting + sLinkKey + "=" + sTempRLVValue];
-            Debug(llList2String(lNewList, -1));
+            lNewList += [ sTempRLVSetting+ "=" + sTempRLVValue];
             if (sTempRLVValue!="y")
             {
                 lTempSettings+=[sTempRLVSetting,sTempRLVValue];
@@ -209,20 +199,22 @@ UpdateSettings()
     }
 }
 
-SaveSetting(string token, string value)
+SaveSettings()
 {
-    llMessageLinked(LINK_THIS, LM_SETTING_SAVE, g_sScript + token + "=" + value, NULL_KEY);
+    //save to DB
+    if (llGetListLength(g_lSettings)>0)
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+    else
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
 }
 
 ClearSettings()
 {
-    integer i = 0;
-    for (; i < llGetListLength(g_lSettings); i += 2)
-    {
-        string token = g_sScript + llList2String(g_lSettings, i);
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, token, NULL_KEY);
-    }
+    //clear settings list
     g_lSettings = [];
+    //remove tpsettings from DB
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
+    //main RLV script will take care of sending @clear to viewer
 }
 
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
@@ -235,6 +227,15 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
 
 integer UserCommand(integer iNum, string sStr, key kID)
 {
+/* //no more needed -- SA: really?
+    else if ((sStr == "reset" || sStr == "runaway") && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER))
+    {
+        //clear db, reset script
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sExToken, NULL_KEY);
+        llResetScript();
+    }
+*/
     if (iNum < COMMAND_OWNER || iNum > COMMAND_WEARER) return FALSE;
     //added for chat command for direct menu acceess
     if (llToLower(sStr) == llToLower(g_sSubMenu) || sStr == "menu " + g_sSubMenu)
@@ -247,6 +248,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
     list lItems = llParseString2List(sStr, [","], []);
     integer n;
     integer iStop = llGetListLength(lItems);
+    integer iChange = FALSE;//set this to true if we see a setting that concerns us
     for (n = 0; n < iStop; n++)
     {
         //split off the parameters (anything after a : or =)
@@ -263,6 +265,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
                 Notify(g_kWearer,"Sorry, but RLV commands may only be given by owner, secowner, or group (if set).",FALSE);
                 return TRUE;
             }
+
             string sOption = llList2String(llParseString2List(sThisItem, ["="], []), 0);
             string sParam = llList2String(llParseString2List(sThisItem, ["="], []), 1);
             integer iIndex = llListFindList(g_lSettings, [sOption]);
@@ -276,13 +279,19 @@ integer UserCommand(integer iNum, string sStr, key kID)
                 //we already have a setting for this option.  update it.
                 g_lSettings = llListReplaceList(g_lSettings, [sOption, sParam], iIndex, iIndex + 1);
             }
-            SaveSetting(sOption, sParam);
-            UpdateSettings();
+
+            iChange = TRUE;
         }
         else if (sBehavior == "clear" && iNum == COMMAND_OWNER)
         {
             ClearSettings();
         }
+    }
+
+    if (iChange)
+    {
+        UpdateSettings();
+        SaveSettings();
     }
     return TRUE;
 }
@@ -296,19 +305,7 @@ default
 
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
-        integer i = 1;
-        integer c = llGetNumberOfPrims();
-        for (; i <= c; i++)
-        {
-            if (llSubStringIndex(llList2String(llGetLinkPrimitiveParams(i, [PRIM_DESC]), 0), "FloatText") == 0)
-            {
-                FLOATLINK = i;
-                i = c;
-            }
-        }
         g_kWearer = llGetOwner();
-        g_lDescriptions += ["See hover text from " + CTYPE];
         // llSleep(1.0);
         // llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
         //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, g_sDBToken, NULL_KEY);
@@ -327,18 +324,14 @@ default
             //split string on both comma and equals sign
             //first see if this is the token we care about
             list lParams = llParseString2List(sStr, ["="], []);
-            string sToken = llList2String(lParams, 0);
-            string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            if (llList2String(lParams, 0) == g_sDBToken)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                i = llListFindList(g_lSettings, [sToken]);
-                if (~i) g_lSettings = llListReplaceList(g_lSettings, [sValue], i+1, i+1);
-                else g_lSettings += [sToken, sValue];
+                //throw away first element
+                //everything else is real settings (should be even number)
+                g_lSettings = llParseString2List(llList2String(lParams, 1), [","], []);
+                UpdateSettings();
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
-            else if (sStr == "settings=set") UpdateSettings();
+            //llOwnerSay("TP DB settings: " + llDumpList2String(settings, ","));
         }
         else if (iNum == RLV_REFRESH)
         {

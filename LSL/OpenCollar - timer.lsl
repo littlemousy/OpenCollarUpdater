@@ -143,49 +143,20 @@ integer WEARERLOCKOUT=620;
 string UPMENU = "^";
 string MORE = ">";
 
-string GetScriptID()
-{
-    // strip away "OpenCollar - " leaving the script's individual name
-    list parts = llParseString2List(llGetScriptName(), ["-"], []);
-    return llStringTrim(llList2String(parts, 1), STRING_TRIM) + "_";
-}
-string PeelToken(string in, integer slot)
-{
-    integer i = llSubStringIndex(in, "_");
-    if (!slot) return llGetSubString(in, 0, i);
-    return llGetSubString(in, i + 1, -1);
-}
-integer GetOwnerChannel(key kOwner, integer iOffset)
-{
-    integer iChan = (integer)("0x"+llGetSubString((string)kOwner,2,7)) + iOffset;
-    if (iChan>0)
-    {
-        iChan=iChan*(-1);
-    }
-    if (iChan > -10000)
-    {
-        iChan -= 30000;
-    }
-    return iChan;
-}
 Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 {
     if (kID == g_kWearer)
     {
         llOwnerSay(sMsg);
     }
-    else if (llGetAgentSize(kID) != ZERO_VECTOR)
+    else
     {
         llInstantMessage(kID,sMsg);
         if (iAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
         }
-    }
-    else // remote request
-    {
-        llRegionSayTo(kID, GetOwnerChannel(g_kWearer, 1111), sMsg);
-    }
+    }    
 }
 
 //===============================================================================
@@ -812,25 +783,37 @@ default
             if (g_iRealRunning || g_iRealRunning)
                 Notify(kID , "You are locked out of the " + g_sToyName + " until the timer expires", FALSE);
         }
+        else if (iNum == LM_SETTING_DELETE )
+        {
+            if (sStr == "leashedto")
+            {
+                g_iWhoCanChangeLeash=504;
+            }
+        }
         else if (iNum == LM_SETTING_DELETE)
         {
-            if (sStr == "leash_leashedto") g_iWhoCanChangeLeash = 504;
-            else if (sStr == "Global_locked") g_iCollarLocked=0;
+            if (sStr == "locked")
+            {
+                g_iCollarLocked=0;
+            }
         }
         else if (iNum == LM_SETTING_SAVE)
         {
-            list lParams = llParseString2List(sStr, ["="], []);
-            string token = llList2String(lParams, 0);
-            string value = llList2String(lParams, 1);
-            if (token == "Global_locked" && (integer)value == 1) g_iCollarLocked = 1;
-            else if (token == "leash_leashedto")
+            if (llGetSubString(sStr, 0, 8) == "leashedto")
             {
-                integer auth = (integer)llList2String(llParseString2List(value, [","], []), 1);
-                if (auth < g_iWhoCanChangeLeash)
+                integer temp = llList2Integer( llParseString2List( sStr , [","] , [] ) , 1 );
+                if (temp < g_iWhoCanChangeLeash)
                 {
-                    g_iWhoCanChangeLeash = auth;
-                    g_iUnleash = 0;
+                    g_iWhoCanChangeLeash=temp;
+                    g_iUnleash=0;
                 }
+            }
+        }
+        else if (iNum == LM_SETTING_SAVE)
+        {
+            if (sStr == "locked=1")
+            {
+                g_iCollarLocked=1;
             }
         }
         else if (iNum == LM_SETTING_RESPONSE)
@@ -838,7 +821,10 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if (sToken == "Global_locked") g_iCollarLocked=(integer)sValue;
+            if (sToken == "locked")
+            {
+                g_iCollarLocked=(integer)sValue;
+            }
         }
         else if (iNum == MENUNAME_REQUEST && sStr == g_sParentMenu)
             // our parent menu requested to receive buttons, so send ours
@@ -990,4 +976,5 @@ default
         }
         g_iLastTime=g_iCurrentTime;
     }
+
 }

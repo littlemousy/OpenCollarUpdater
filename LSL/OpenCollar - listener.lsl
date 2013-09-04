@@ -6,11 +6,14 @@ integer g_iListenChan = 1;
 integer g_iListenChan0 = TRUE;
 string g_sPrefix = ".";
 
+integer g_iHUDChan = -1334245234; // instead this should be the new channel to be used by any object not from the wearer itself. For attachments of the wearer use the interface channel. This channel wil be personlaized below
+
 integer g_iLockMeisterChan = -8888;
 
 integer g_iListener1;
 integer g_iListener2;
 integer g_iLockMesiterListener;
+integer g_iHUDListener;
 
 //MESSAGE MAP
 integer COMMAND_NOAUTH = 0;
@@ -40,10 +43,10 @@ integer MENUNAME_RESPONSE = 3001;
 integer EXT_COMMAND_COLLAR = 499;
 
 // new g_sSafeWord
-string g_sSafeWord = "RED";
+string g_sSafeWord = "SAFEWORD";
 
 //added for attachment auth
-integer g_iInterfaceChannel = -12587429; // AO Backwards Compatibility
+integer g_iInterfaceChannel = -12587429;
 integer g_iListenHandleAtt;
 
 integer ATTACHMENT_REQUEST = 600;
@@ -55,8 +58,29 @@ string g_sSeparator = "|";
 string g_iAuth;
 string UUID;
 string g_sCmd;
-string g_sScript;
-string CTYPE = "collar";
+
+
+//===============================================================================
+//= parameters   :    key owner            key of the person to send the message to
+//=                    integer nOffset        Offset to make sure we use really a unique channel
+//=
+//= description  : Function which calculates a unique channel number based on the owner key, to reduce lag
+//=
+//= returns      : Channel number to be used
+//===============================================================================
+integer GetOwnerChannel(key kOwner, integer iOffset)
+{
+    integer iChan = (integer)("0x"+llGetSubString((string)kOwner,2,7)) + iOffset;
+    if (iChan>0)
+    {
+        iChan=iChan*(-1);
+    }
+    if (iChan > -10000)
+    {
+        iChan -= 30000;
+    }
+    return iChan;
+}
 
 Debug(string sStr)
 {
@@ -70,6 +94,8 @@ SetListeners()
     llListenRemove(g_iLockMesiterListener);
     llListenRemove(g_iListenHandleAtt);
 
+    llListenRemove(g_iHUDListener);
+
     if(g_iListenChan0 == TRUE)
     {
         g_iListener1 = llListen(0, "", NULL_KEY, "");
@@ -79,19 +105,15 @@ SetListeners()
     g_iListenHandleAtt = llListen(g_iInterfaceChannel, "", "", "");
     g_iListener2 = llListen(g_iListenChan, "", NULL_KEY, "");
     g_iLockMesiterListener = llListen(g_iLockMeisterChan, "", NULL_KEY, (string)g_kWearer + "collar");
+
+    g_iHUDListener = llListen(g_iHUDChan, "", NULL_KEY ,"");
+
 }
 
-SetPrefix(string sValue)
+string AutoPrefix()
 {
-    if (sValue != "auto") g_sPrefix = sValue;
-    else
-    {
-        list name = llParseString2List(llKey2Name(g_kWearer), [" "], []);
-        string init = llGetSubString(llList2String(name, 0), 0, 0);
-        init += llGetSubString(llList2String(name, 1), 0, 0);
-        g_sPrefix = llToLower(init);
-    }
-    Debug("Prefix set to: " + g_sPrefix);
+    list sName = llParseString2List(llKey2Name(g_kWearer), [" "], []);
+    return llToLower(llGetSubString(llList2String(sName, 0), 0, 0)) + llToLower(llGetSubString(llList2String(sName, 1), 0, 0));
 }
 
 string StringReplace(string sSrc, string sFrom, string sTo)
@@ -123,30 +145,12 @@ integer StartsWith(string sHayStack, string sNeedle) // http://wiki.secondlife.c
     return llDeleteSubString(sHayStack, llStringLength(sNeedle), -1) == sNeedle;
 }
 
-integer GetOwnerChannel(key kOwner, integer iOffset)
-{
-    integer iChan = (integer)("0x"+llGetSubString((string)kOwner,2,7)) + iOffset;
-    if (iChan>0)
-    {
-        iChan=iChan*(-1);
-    }
-    if (iChan > -10000)
-    {
-        iChan -= 30000;
-    }
-    return iChan;
-}
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -176,11 +180,14 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         g_kWearer = llGetOwner();
-        SetPrefix("auto");
+        g_sPrefix = AutoPrefix();
+
+        g_iHUDChan = GetOwnerChannel(g_kWearer, 1111); // persoalized channel for this sub
+
+        //llInstantMessage(, "Prefix set to '" + g_sPrefix + "'.", g_kWearer);
         SetListeners();
-        //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, "Global_prefix", NULL_KEY);
+        //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, "prefix", NULL_KEY);
         //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, "channel", NULL_KEY);
     }
 
@@ -196,31 +203,44 @@ default
         }
     }
 
-    listen(integer iChan, string sName, key kID, string sMsg)
+    listen(integer sChan, string sName, key kID, string sMsg)
     {
-        if (iChan == g_iLockMeisterChan)
+        // new object/HUD channel block
+        if (sChan == g_iHUDChan)
         {
-            llWhisper(g_iLockMeisterChan,(string)g_kWearer + "collar ok");
-            return;
-        }
-        if(llGetOwnerKey(kID) == g_kWearer) // also works for attachments
-        {
-            string sw = sMsg; // we'll have to shave pieces off as we go to test
-            // safeword can be the safeword or safeword said in OOC chat "((SAFEWORD))"
-            // and may include prefix
-            if (llGetSubString(sw, 0, 1) == "((" && llGetSubString(sw, -2, -1) == "))")
-                sw = llGetSubString(sw, 2, -3);
-            if (StartsWith(sw, g_sPrefix))
-                sw = llGetSubString(sw, llStringLength(g_sPrefix), -1);
-            if (sw == g_sSafeWord)
+            //check for a ping, if we find one we request auth and answer in LMs with a pong
+            if (sMsg==(string)g_kWearer + ":ping")
             {
-                llMessageLinked(LINK_SET, COMMAND_SAFEWORD, "", NULL_KEY);
-                llOwnerSay("You used your safeword, your owner will be notified you did.");
-                return;
+                llMessageLinked(LINK_SET, COMMAND_NOAUTH, "ping", llGetOwnerKey(kID));
+            }
+            // an object wants to know the version, we check if it is allowed to
+            if (sMsg==(string)g_kWearer + ":version")
+            {
+                llMessageLinked(LINK_SET, COMMAND_NOAUTH, "objectversion", llGetOwnerKey(kID));
+            }
+            // it it is not a ping, it should be a command for use, to make sure it has to have the key in front of it
+            else if (StartsWith(sMsg, (string)g_kWearer + ":"))
+            {
+                sMsg = llGetSubString(sMsg, 37, -1);
+                llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+            }
+            else
+            {
+                llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, llGetOwnerKey(kID));
             }
         }
+
+        else if (sChan == g_iLockMeisterChan)
+        {
+            llWhisper(g_iLockMeisterChan,(string)g_kWearer + "collar ok");
+        }
+        else if((kID == g_kWearer) && ((sMsg == g_sSafeWord)||(sMsg == "(("+g_sSafeWord+"))")))
+        { // safeword can be the safeword or safeword said in OOC chat "((SAFEWORD))"
+            llMessageLinked(LINK_SET, COMMAND_SAFEWORD, "", NULL_KEY);
+            llOwnerSay("You used your safeword, your owner will be notified you did.");
+        }
         //added for attachment auth (garvin)
-        if (iChan == g_iInterfaceChannel)
+        else if (sChan == g_iInterfaceChannel)
         {
             Debug(sMsg);
             //do nothing if wearer isnt owner of the object
@@ -283,6 +303,7 @@ default
 
     link_message(integer iSender, integer iNum, string sStr, key kID)
     {
+
         if (iNum >= COMMAND_OWNER && iNum <= COMMAND_WEARER)
         {
             list lParams = llParseString2List(sStr, [" "], []);
@@ -304,16 +325,18 @@ default
             {
                 if (sCommand == "prefix")
                 {
-                    string value = llList2String(lParams, 1);
-                    if (value == "")
+                    string sNewPrefix = llList2String(lParams, 1);
+                    if (sNewPrefix == "auto")
                     {
-                        Notify(kID,"prefix: " + g_sPrefix, FALSE);
-                        return;
+                        g_sPrefix = AutoPrefix();
                     }
-                    SetPrefix(value);
+                    else if (sNewPrefix != "")
+                    {
+                        g_sPrefix = sNewPrefix;
+                    }
                     SetListeners();
-                    Notify(kID, "\n" + llKey2Name(g_kWearer) + "'s prefix is '" + g_sPrefix + "'.\nTouch the " + CTYPE + " or say '" + g_sPrefix + "menu' for the main menu.\nSay '" + g_sPrefix + "help' for a list of chat commands.", FALSE);
-                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, "Global_prefix=" + g_sPrefix, NULL_KEY);
+                    Notify(kID, "\n" + llKey2Name(g_kWearer) + "'s prefix is '" + g_sPrefix + "'.\nTouch the collar or say '" + g_sPrefix + "menu' for the main menu.\nSay '" + g_sPrefix + "help' for a list of chat commands.", FALSE);
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, "prefix=" + g_sPrefix, NULL_KEY);
                 }
                 else if (sCommand == "channel")
                 {
@@ -325,11 +348,11 @@ default
                         Notify(kID, "Now listening on channel " + (string)g_iListenChan + ".", FALSE);
                         if (g_iListenChan0)
                         {
-                            llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "channel=" + (string)g_iListenChan + ",TRUE", NULL_KEY);
+                            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "channel=" + (string)g_iListenChan + ",TRUE", NULL_KEY);
                         }
                         else
                         {
-                            llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "channel=" + (string)g_iListenChan + ",FALSE", NULL_KEY);
+                            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "channel=" + (string)g_iListenChan + ",FALSE", NULL_KEY);
                         }
                     }
                     else if (iNewChan == 0)
@@ -337,20 +360,42 @@ default
                         g_iListenChan0 = TRUE;
                         SetListeners();
                         Notify(kID, "You enabled the public channel listener.\nTo disable it use -1 as channel command.", FALSE);
-                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "channel=" + (string)g_iListenChan + ",TRUE", NULL_KEY);
+                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, "channel=" + (string)g_iListenChan + ",TRUE", NULL_KEY);
                     }
                     else if (iNewChan == -1)
                     {
                         g_iListenChan0 = FALSE;
                         SetListeners();
                         Notify(kID, "You disabled the public channel listener.\nTo enable it use 0 as channel command, remember you have to do this on your channel /" +(string)g_iListenChan, FALSE);
-                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "channel=" + (string)g_iListenChan + ",FALSE", NULL_KEY);
+                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, "channel=" + (string)g_iListenChan + ",FALSE", NULL_KEY);
                     }
                     else
                     {  //they left the param blank
                         Notify(kID, "Error: 'channel' must be given a number.", FALSE);
                     }
                 }
+                //                else if(kID == g_kWearer)
+                //                {
+                //                    if (sCommand == "safeword")
+                //                    {   // new for safeWord
+                //                        string sValue = llList2String(lParams, 1);
+                //                        if(llStringTrim(sValue, STRING_TRIM) != "")
+                //                        {
+                //                            g_sSafeWord = sValue;
+                //                            llOwnerSay("You set a new safeword: " + sValue + ".");
+                //                            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "safeword=" + sValue, NULL_KEY);
+                //                        }
+                //                        else
+                //                        {
+                //                            llOwnerSay("Your safeword is: " + g_sSafeWord + ".");
+                //                        }
+                //                    }
+                //                    else if (sStr == g_sSafeWord)
+                //                    { //safeWord used with prefix
+                //                        llMessageLinked(LINK_SET, COMMAND_SAFEWORD, "", NULL_KEY);
+                //                        llOwnerSay("You used your safeword, your owner will be notified you dkID.");
+                //                    }
+                //                }
             }
             if (kID == g_kWearer)
             {
@@ -360,12 +405,17 @@ default
                     {
                         g_sSafeWord = llList2String(lParams, 1);
                         llOwnerSay("You set a new safeword: " + g_sSafeWord + ".");
-                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "safeword=" + g_sSafeWord, NULL_KEY);
+                        llMessageLinked(LINK_SET, LM_SETTING_SAVE, "safeword=" + g_sSafeWord, NULL_KEY);
                     }
                     else
                     {
                         llOwnerSay("Your safeword is: " + g_sSafeWord + ".");
                     }
+                }
+                else if (sStr == g_sSafeWord)
+                { //safeword used with prefix
+                    llMessageLinked(LINK_SET, COMMAND_SAFEWORD, "", NULL_KEY);
+                    llOwnerSay("You used your safeword, your owner will be notified you did.");
                 }
             }
         }
@@ -374,40 +424,39 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (sToken == "Global_prefix")
+            if (sToken == "prefix")
             {
-                if (sValue == "") sValue = "auto";
-                SetPrefix(sValue);
+                //prefix is the only token for which the httpdb will send a blank value, just so that
+                //this script can know it's time to send the helpful popup.
+                g_sPrefix = sValue;
+                //llInstantMessage(g_kWearer, "Loaded prefix " + g_sPrefix + " from database.");
+                SetListeners();
+                //Notify(g_kWearer "\nPrefix set to '" + g_sPrefix + "'.\nTouch the collar or say '" + g_sPrefix + "menu' for the main menu.\nSay '" + g_sPrefix + "help' for a list of chat commands.");
+            }
+            else if (sToken == "channel")
+            {
+                g_iListenChan = (integer)sValue;
+                if (llGetSubString(sValue, llStringLength(sValue) - 5 , -1) == "FALSE")
+                {
+                    g_iListenChan0 = FALSE;
+                }
+                else
+                {
+                    g_iListenChan0 = TRUE;
+                }
+                //llInstantMessage(g_kWearer, "Commands may be given on channel " + sValue + ".");
                 SetListeners();
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
-            else if (llGetSubString(sToken, 0, i) == g_sScript)
+            else if (sToken == "safeword")
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "channel")
-                {
-                    g_iListenChan = (integer)sValue;
-                    if (llGetSubString(sValue, llStringLength(sValue) - 5 , -1) == "FALSE")
-                    {
-                        g_iListenChan0 = FALSE;
-                    }
-                    else
-                    {
-                        g_iListenChan0 = TRUE;
-                    }
-                    //llInstantMessage(g_kWearer, "Commands may be given on channel " + sValue + ".");
-                    SetListeners();
-                }
-                else if (sToken == "safeword")
-                {
-                    g_sSafeWord = sValue;
-                }
+                g_sSafeWord = sValue;
+                //                llOwnerSay("Your g_sSafeWord " + g_sSafeWord + " was loaded from the httpdb.");
             }
         }
         //        else if (iNum == LM_SETTING_EMPTY && sStr == "prefix")
         //        {
-        //            SetPrefix("auto");
+        //            SetListeners();
+        //            Notify(g_kWearer, "\nPrefix set to '" + g_sPrefix + "'.\nTouch the collar or say '" + g_sPrefix + "menu' for the main menu.\nSay '" + g_sPrefix + "help' for a list of chat commands.");
         //        }
         else if (iNum == POPUP_HELP)
         {

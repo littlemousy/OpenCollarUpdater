@@ -90,3 +90,4 @@ default
         llRemoveInventory(llGetScriptName());
     }
 }
+

@@ -55,7 +55,6 @@ integer RLV_CLEAR = 6002;//RLV plugins should clear their restriction lists upon
 integer g_bDetached = FALSE;
 
 key g_kWearer;
-string CTYPE = "collar";
 
 Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 {
@@ -65,7 +64,7 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
     }
     else
     {
-        llInstantMessage(kID, sMsg);
+        llInstantMessage(kID,sMsg);
         if (iAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
@@ -173,10 +172,10 @@ SetLockElementAlpha() //EB
 Lock()
 {
     g_iLocked = TRUE;
-    llMessageLinked(LINK_SET, LM_SETTING_SAVE, "Global_locked=1", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, "locked=1", NULL_KEY);
     llMessageLinked(LINK_SET, RLV_CMD, "detach=n", NULL_KEY);
     llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + UNLOCK, NULL_KEY);
-    llPlaySound("caa78697-8493-ead3-4737-76dcc926df30", 1.0);
+    llPlaySound("abdb1eaa-6160-b056-96d8-94f548a14dda", 1.0);
     llMessageLinked(LINK_SET, MENUNAME_REMOVE, g_sParentMenu + "|" + LOCK, NULL_KEY);
     SetLockElementAlpha();//EB
 }
@@ -184,10 +183,10 @@ Lock()
 Unlock()
 {
     g_iLocked = FALSE;
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, "Global_locked", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, "locked", NULL_KEY);
     llMessageLinked(LINK_SET, RLV_CMD, "detach=y", NULL_KEY);
     llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + LOCK, NULL_KEY);
-    llPlaySound("ff09cab4-3358-326e-6426-ec8d3cd3b98e", 1.0);
+    llPlaySound("ee94315e-f69b-c753-629c-97bd865b7094", 1.0);
     llMessageLinked(LINK_SET, MENUNAME_REMOVE, g_sParentMenu + "|" + UNLOCK, NULL_KEY);
     SetLockElementAlpha(); //EB
 }
@@ -226,19 +225,19 @@ default
                     Lock();
                     //            owner = kID; //need to store the one who locked (who has to be also owner) here
                     Notify(kID, "Locked.", FALSE);
-                    if (kID!=g_kWearer) llOwnerSay("Your " + CTYPE + " has been locked.");
+                    if (kID!=g_kWearer) llOwnerSay("Your collar has been locked.");
                 }
-                else Notify(kID, "Sorry, only primary owners and wearer can lock the " + CTYPE + ".", FALSE);
+                else Notify(kID, "Sorry, only primary owners and wearer can lock the collar.", FALSE);
             }
-            else if (sStr == "runaway" || sStr == "unlock" || (g_iLocked && sStr == "togglelock"))
+            else if (sStr == "unlock" || (g_iLocked && sStr == "togglelock"))
             {
                 if (iNum == COMMAND_OWNER)
                 {  //primary owners can lock and unlock. no one else
                     Unlock();
                     Notify(kID, "Unlocked.", FALSE);
-                    if (kID!=g_kWearer) llOwnerSay("Your " + CTYPE + " has been unlocked.");
+                    if (kID!=g_kWearer) llOwnerSay("Your collar has been unlocked.");
                 }
-                else Notify(kID, "Sorry, only primary owners can unlock the " + CTYPE + ".", FALSE);
+                else Notify(kID, "Sorry, only primary owners can unlock the collar.", FALSE);
             }
             
             else if (sStr == "menu " + LOCK)
@@ -247,9 +246,9 @@ default
                 {   //primary owners and wearer can lock. no one else
                     Lock();
                     Notify(kID, "Locked.", FALSE);
-                    if (kID!=g_kWearer) llOwnerSay("Your " + CTYPE + " has been locked.");
+                    if (kID!=g_kWearer) llOwnerSay("Your collar has been locked.");
                 }
-                else Notify(kID, "Sorry, only primary owners and wearer can lock the " + CTYPE + ".", FALSE);
+                else Notify(kID, "Sorry, only primary owners and wearer can lock the collar.", FALSE);
                 llMessageLinked(LINK_SET, iNum, "menu " + g_sParentMenu, kID);
             }
             else if (sStr == "menu " + UNLOCK)
@@ -258,9 +257,9 @@ default
                 {  //primary owners can unlock. no one else
                     Unlock();
                     Notify(kID, "Unlocked.", FALSE);
-                    if (kID!=g_kWearer) llOwnerSay("Your " + CTYPE + " has been unlocked.");
+                    if (kID!=g_kWearer) llOwnerSay("Your collar has been unlocked.");
                 }
-                else Notify(kID, "Sorry, only primary owners can unlock the " + CTYPE + ".", FALSE);
+                else Notify(kID, "Sorry, only primary owners can unlock the collar.", FALSE);
                 llMessageLinked(LINK_SET, iNum, "menu " + g_sParentMenu, kID);
             }
         }
@@ -269,7 +268,7 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if (sToken == "Global_locked")
+            if (sToken == "locked")
             {
                 g_iLocked = (integer)sValue;
                 if (g_iLocked)
@@ -287,8 +286,7 @@ default
                 SetLockElementAlpha(); //EB
 
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
-            else if (sToken == "auth_owner")
+            else if (sToken == "owner")
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
             }
@@ -298,7 +296,7 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if (sToken == "auth_owner")
+            if (sToken == "owner")
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
             }
@@ -336,6 +334,7 @@ default
                 llMessageLinked(LINK_SET, RLV_CMD, "detach=y", NULL_KEY);
             }
         }
+
     }
     attach(key kID)
     {
@@ -370,4 +369,5 @@ default
             llResetScript();
         }
     }
+
 }

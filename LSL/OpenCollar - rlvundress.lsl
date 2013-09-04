@@ -1,4 +1,4 @@
-﻿//OpenCollar - rlvundress
+//OpenCollar - rlvundress
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 //gives menus for clothing and attachment, stripping and locking
 
@@ -12,7 +12,7 @@ string SELECT_RECURS= "*Recursively";
 list g_lRLVcmds = ["attach","detach","remoutfit", "addoutfit","remattach","addattach"];
 
 list g_lSettings;//2-strided list in form of [option, param]
-string CTYPE = "collar";
+
 
 list LOCK_CLOTH_POINTS = [
     "Gloves",
@@ -153,13 +153,15 @@ integer g_iListener;
 key g_kMenuUser; // id of the avatar who will get the next menu after asynchronous response from RLV
 integer g_iMenuAuth; // auth level of that user
 
+string g_sDBToken = "undress";
+string g_sDBTokenLockAll = "DressAllLocked";
+
 integer g_iRLVOn = FALSE;
 
 list g_lLockedItems; // list of locked clothes
 list g_lLockedAttach; // list of locked attachmemts
 
 key g_kWearer;
-string g_sScript;
 string g_sWearerName;
 integer g_iAllLocked = 0;  //1=all clothes are locked on
 
@@ -176,7 +178,7 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
     }
     else
     {
-        llInstantMessage(kID, sMsg);
+        llInstantMessage(kID,sMsg);
         if (iAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
@@ -339,24 +341,24 @@ UpdateSettings()
             string sValue=llList2String(g_lSettings, n + 1);
             //Debug(llList2String(g_lSettings, n) + "=" + sValue);
             lNewList += [llList2String(g_lSettings, n) + "=" + llList2String(g_lSettings, n + 1)];
-            if (llGetListLength(sOption)==1 && llList2String(sOption,0)=="remoutfit")
-            {
-                if (!~llListFindList(g_lLockedItems, [ALL])) g_lLockedItems += [ALL];
-            }
-            else if (llGetListLength(sOption)==2 && ~llSubStringIndex(llList2String(sOption, 0), "outfit"))
-            {
-                if (!~llListFindList(g_lLockedItems, [llList2String(sOption, 1)]))
-                    g_lLockedItems += [llList2String(sOption,1)];
-            }
-            else if (llGetListLength(sOption)==2 && ~llSubStringIndex(llList2String(sOption, 0), "tach"))
-            {
-                if (!~llListFindList(g_lLockedAttach, [llList2String(sOption,1)]))
-                    g_lLockedAttach += [llList2String(sOption,1)];
-            }
+            if (llGetListLength(sOption)==2
+                && (llList2String(sOption,0)=="addoutfit"
+                    ||llList2String(sOption,0)=="remoutfit")
+                && sValue=="n")
+                g_lLockedItems += [llList2String(sOption,1)];
+            if (llGetListLength(sOption)==1 && llList2String(sOption,0)=="remoutfit" && sValue=="n")
+                g_lLockedItems += [ALL];
+
+            if (llGetListLength(sOption)==2
+                && (llList2String(sOption,0)=="addattach"
+                    || llList2String(sOption,0)=="remattach"
+                    || llList2String(sOption,0)=="detach")
+                && sValue=="n"
+                && (~llListFindList(g_lLockedAttach, [llList2String(sOption,1)])))
+                g_lLockedAttach += [llList2String(sOption,1)];
         }
         //output that string to viewer
         llMessageLinked(LINK_SET, RLV_CMD, llDumpList2String(lNewList, ","), NULL_KEY);
-        Debug("Loaded locks: Cloth- " + llList2CSV(g_lLockedItems) + ": Attach- " + llList2CSV(g_lLockedAttach));
     }
 }
 
@@ -368,7 +370,7 @@ ClearSettings()
     g_lLockedAttach=[];
     SaveLockAllFlag(0);
     //remove tpsettings from DB
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     //main RLV script will take care of sending @clear to viewer
 }
 
@@ -382,12 +384,12 @@ SaveLockAllFlag(integer iSetting)
     if(iSetting > 0)
     {
         //save the flag to the database
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "LockAll=Y", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBTokenLockAll+"=Y", NULL_KEY);
     }
     else
     {
         //delete the flag from the database
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "LockAll", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBTokenLockAll, NULL_KEY);
     }
 }
 
@@ -437,7 +439,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
                 {   //we already have a setting for this option.  update it.
                     g_lSettings = llListReplaceList(g_lSettings, [sOption, sParam], iIndex, iIndex + 1);
                 }
-                llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "List=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+                llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
             }
             else if (sParam == "y")
             {
@@ -446,9 +448,9 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
                     g_lSettings = llDeleteSubList(g_lSettings, iIndex, iIndex + 1);
                 }
                 if (llGetListLength(g_lSettings)>0)
-                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "List=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
                 else
-                    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
             }
         }
     }
@@ -456,7 +458,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -466,7 +468,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -533,7 +535,8 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
         {
             if (llListFindList(g_lLockedAttach, [sPoint]) == -1) g_lLockedAttach += [sPoint];
             Notify(kID, g_sWearerName+"'s "+sPoint+" attachment point is now locked.", TRUE);
-            llMessageLinked(LINK_SET, iNum,  "detach:" + sPoint + "=n", kID);
+            llMessageLinked(LINK_SET, iNum,  "addattach:" + sPoint + "=n", kID);
+            llMessageLinked(LINK_SET, iNum,  "remattach:" + sPoint + "=n", kID);
         }
         else
         {
@@ -576,7 +579,8 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
         {
             string sMessage = llGetSubString(sStr, 17, -1);
         {
-            llMessageLinked(LINK_SET, iNum,  "detach:" + sMessage + "=y", kID);
+            llMessageLinked(LINK_SET, iNum,  "addattach:" + sMessage + "=y", kID);
+            llMessageLinked(LINK_SET, iNum,  "remattach:" + sMessage + "=y", kID);
             Notify(kID, g_sWearerName+"'s "+sMessage+" has been unlocked.", TRUE);
             integer iIndex = llListFindList(g_lLockedAttach,[sMessage]);
             if (iIndex!=-1) g_lLockedAttach = llDeleteSubList(g_lLockedAttach,iIndex,iIndex);
@@ -592,7 +596,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -603,7 +607,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -613,7 +617,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -628,7 +632,6 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         g_kWearer = llGetOwner();
         g_sWearerName = llKey2Name(g_kWearer);
         llMessageLinked(LINK_SET, MENUNAME_REQUEST, g_sSubMenu, NULL_KEY);
@@ -653,24 +656,20 @@ default
             //split string on both comma and equals sign
             //first see if this is the token we care about
             list lParams = llParseString2List(sStr, ["="], []);
-            string sToken = llList2String(lParams, 0);
-            string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            if ( llList2String(lParams, 0)== g_sDBTokenLockAll)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "LockAll")
-                {
-                    g_iAllLocked = 1;
-                    DoLockAll(kID);
-                }
-                else if (sToken == "List")
-                {
-                    g_lSettings = llParseString2List(sValue, [","], []);
-                    UpdateSettings();
-                }
+                //re-apply the lockall after a re-log
+                g_iAllLocked = 1;
+                DoLockAll(kID);
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
+
+            if (llList2String(lParams, 0) == g_sDBToken)
+            {
+                //throw away first element
+                //everything else is real settings (should be even number)
+                g_lSettings = llParseString2List(llList2String(lParams, 1), [","], []);
+                UpdateSettings();
+            }
         }
         else if (iNum == RLV_REFRESH)
         {//rlvmain just started up.  Tell it about our current restrictions
@@ -745,7 +744,7 @@ default
                     if (sMessage == UPMENU) MainMenu(kAv, iAuth);
                     else if (sMessage == "Attachments") QueryAttachments(kAv, iAuth);
                     else if (sMessage == ALL) 
-                    // SA:Â we can count ourselves lucky that all people who can see the menu have sufficient privileges for remoutfit commands!
+                    // SA: we can count ourselves lucky that all people who can see the menu have sufficient privileges for remoutfit commands!
                     //    Note for people looking for the auth check: it would have been here, look no further!
                     { //send the RLV command to remove it.
                         llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit=force", NULL_KEY);
@@ -845,4 +844,5 @@ default
     {
         llResetScript();
     }
+
 }

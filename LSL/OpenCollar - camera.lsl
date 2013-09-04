@@ -1,9 +1,10 @@
-﻿//OpenCollar - camera
+//OpenCollar - camera
 //allows dom to set different camera mode
 //responds to commands from modes list
 
 key g_kWearer;
 integer g_iLastNum;
+string g_sDBToken = "cam";
 string g_sMyMenu = "Camera";
 string g_sParentMenu = "AddOns";
 key g_kMenuID;
@@ -59,7 +60,6 @@ integer DIALOG_TIMEOUT = -9002;
 
 string UPMENU = "^";
 //string MORE = ">";
-string g_sScript;
 
 CamMode(string sMode)
 {
@@ -75,7 +75,7 @@ ClearCam()
     llClearCameraParams();
     g_iLastNum = 0;    
     g_iSync2Me = FALSE;
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "all", "");    
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, "");    
 }
 
 CamFocus(vector g_vCamPos, rotation g_rCamRot)
@@ -255,20 +255,18 @@ string TightListTypeDump(list lInput, string sSeperators) {//This function is da
     return sSeperators + sCumulator;
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) 
 {
-    if (kID == g_kWearer)
+    if (kID == g_kWearer) 
     {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
+    } else {
+        llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) 
         {
             llOwnerSay(sMsg);
         }
-    }
+    }    
 }
 
 Debug(string sStr)
@@ -276,11 +274,9 @@ Debug(string sStr)
     //llOwnerSay(llGetScriptName() + ": " + sStr);
 }
 
-SaveSetting(string sToken)
+SaveSetting(string sSetting)
 {
-    sToken = g_sScript + sToken;
-    string sValue = (string)g_iLastNum;
-    llMessageLinked(LINK_SET, LM_SETTING_SAVE, sToken + "=" + sValue, "");
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + sSetting + "," + (string)g_iLastNum, "");
 }
 
 ChatCamParams(integer chan)
@@ -386,7 +382,12 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
             llSetTimerEvent(g_fReapeat);
         }
     }
-    else if ((iNum == COMMAND_OWNER  || kID == g_kWearer) && sStr == "runaway")
+    else if (iNum == COMMAND_OWNER  || kID == g_kWearer && sStr == "runaway")
+    {
+        ClearCam();
+        llResetScript();
+    }
+    else if (iNum == COMMAND_OWNER && sStr == "reset")
     {
         ClearCam();
         llResetScript();
@@ -403,7 +404,6 @@ default
     
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         if (llGetAttached())
         {
             llRequestPermissions(llGetOwner(), PERMISSION_CONTROL_CAMERA | PERMISSION_TRACK_CAMERA);
@@ -413,7 +413,7 @@ default
     
     run_time_permissions(integer iPerms)
     {
-        if (iPerms & (PERMISSION_CONTROL_CAMERA | PERMISSION_TRACK_CAMERA))
+        if (iPerms & PERMISSION_CONTROL_CAMERA)
         {
             llClearCameraParams();
         }
@@ -437,17 +437,22 @@ default
             list lParams = llParseString2List(sStr, ["=", ","], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            integer iNum = (integer)llList2String(lParams, 2);
+            if (sToken == g_sDBToken)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
                 if (llGetPermissions() & PERMISSION_CONTROL_CAMERA)
                 {
-                    if (sToken == "freeze") LockCam();
-                    else if (~llListFindList(g_lModes, [sToken])) CamMode(sToken);
-                    g_iLastNum = (integer)sValue;
+                    if (sValue == "freeze")
+                    {
+                        LockCam();
+                    }
+                    else if (~llListFindList(g_lModes, [sValue]))
+                    {
+                        CamMode(sValue);
+                    }
+                    g_iLastNum = iNum;                    
                 }
-            }           
+            }            
         }
         else if (iNum == DIALOG_RESPONSE)
         {

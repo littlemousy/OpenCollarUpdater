@@ -1,7 +1,9 @@
-﻿//OpenCollar - rlvsit
+//OpenCollar - rlvsit
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 string g_sParentMenu = "RLV";
 string g_sSubMenu = "Sit";
+string g_sDBToken = "rlvsit";
+
 
 list g_lSettings;//2-strided list in form of [option, param]
 
@@ -31,7 +33,6 @@ list g_lIdmtCmds = [
 
 string TURNON = "Allow";
 string TURNOFF = "Forbid";
-string CTYPE = "collar";
 
 key kMenuID;
 key g_kSitID;
@@ -89,7 +90,6 @@ integer DIALOG_TIMEOUT = -9002;
 string UPMENU = "^";
 
 key g_kWearer;
-string g_sScript;
 
 integer g_iRLVOn=FALSE;
 
@@ -98,17 +98,12 @@ integer RandomChannel()
     return llRound(llFrand(10000000)) + 100000;
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -137,7 +132,7 @@ Menu(key kID, integer iAuth)
 {
     if (!g_iRLVOn)
     {
-        Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+        Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
         llMessageLinked(LINK_SET, iAuth, "menu RLV", kID);
         return;
     }
@@ -230,9 +225,9 @@ SaveSettings()
 {
     //save to DB
     if (llGetListLength(g_lSettings)>0)
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "List=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
     else
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
 
 }
 
@@ -241,7 +236,7 @@ ClearSettings()
     //clear settings list
     g_lSettings = [];
     //remove tpsettings from DB
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     //main RLV script will take care of sending @clear to viewer
 }
 
@@ -288,7 +283,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
     {
         if (!g_iRLVOn)
         {
-            Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+            Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
             llMessageLinked(LINK_SET, iNum, "menu RLV", kID);
             return TRUE;
         }
@@ -312,9 +307,8 @@ integer UserCommand(integer iNum, string sStr, key kID)
         //and see if the thing being set concerns us
         string sThisItem = llList2String(lItems, n);
         string sBehavior = llList2String(llParseString2List(sThisItem, ["=", ":"], []), 0);
-        if (sStr == "standnow")
+        if (sStr == "unsit=force")
         {
-            sStr = "unsit=force";
             //this one's just weird
             //llOwnerSay("forcing stand");
             if (iNum == COMMAND_WEARER)
@@ -323,9 +317,14 @@ integer UserCommand(integer iNum, string sStr, key kID)
             }
             else
             {
-                integer iIndex = llListFindList(g_lSettings, ["unsit"]);
-                if (~iIndex && llList2String(g_lSettings, iIndex + 1)!="n") iIndex=-1;
-                if (~iIndex) sStr = "unsit=y," + sStr + ",unsit=n";
+                integer iIndex = llListFindList(g_lSettings, ["unsit"]); // Check for ability to unsit
+                if (iIndex>=0)
+                    if (llList2String(g_lSettings, iIndex + 1)!="n")
+                        iIndex=-1;
+
+                if (iIndex!=-1) // If standing is disabled
+                    sStr="unsit=y,"+sStr+",unsit=n";
+
                 llMessageLinked(LINK_SET, RLV_CMD, sStr, NULL_KEY);
             }
         }
@@ -381,7 +380,7 @@ default
     state_entry()
     {
         llSetTimerEvent(0.0);
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
+
         g_kWearer = llGetOwner();
         
     }
@@ -466,17 +465,14 @@ default
             //split string on both comma and equals sign
             //first see if this is the token we care about
             list lParams = llParseString2List(sStr, ["="], []);
-            string sToken = llList2String(lParams, 0);
-            string sValue = llList2String(lParams, 1);
             integer iChange = FALSE;
-            if (sToken == g_sScript + "List")
+            if (llList2String(lParams, 0) == g_sDBToken)
             {
                 //throw away first element
                 //everything else is real settings (should be even number)
-                g_lSettings = llParseString2List(sValue, [","], []);
+                g_lSettings = llParseString2List(llList2String(lParams, 1), [","], []);
                 UpdateSettings();
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
         }
         else if (iNum == RLV_REFRESH)
         {
@@ -541,7 +537,7 @@ default
                         else if (sMessage == "StandNow")
                         {
         
-                            UserCommand(iAuth, "standnow", kAv);
+                            UserCommand(iAuth, "unsit=force", kAv);
                             Menu(kAv, iAuth);
                         }
                         else
@@ -645,6 +641,5 @@ default
     {
         //nothing close by to sit on, tell g_kMenuUser
         Notify(g_kMenuUser, "Unable to find sit targets.", FALSE);
-
     }
 }

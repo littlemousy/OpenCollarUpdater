@@ -1,4 +1,4 @@
-﻿//OpenCollar - hide
+//OpenCollar - hide
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 //on getting menu request, give element menu
 //on getting element type, give Hide and Show buttons
@@ -13,13 +13,14 @@ key g_kWearer;
 
 key g_kDialogID;
 key g_kTouchID;
-
+ 
+string g_sDBToken = "elementalpha";
 list g_lAlphaSettings;
 string g_sIgnore = "nohide";
 list g_lButtons;
 
 integer g_iAppLock = FALSE;
-string g_sAppLockToken = "Appearance_Lock";
+string g_sAppLockToken = "AppLock";
 
 
 //MESSAGE MAP
@@ -54,25 +55,24 @@ integer TOUCH_RESPONSE = -9502;
 integer TOUCH_EXPIRE = -9503;
 
 //5000 block is reserved for IM slaves
-string CTYPE = "collar";
+
 string HIDE = "Hide";
 string SHOW = "Show";
 string UPMENU = "^";
 string SHOWN = "Shown";
 string HIDDEN = "Hidden";
 string ALL = "All";
-string g_sScript;
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
+Notify(key keyID, string sMsg, integer nAlsoNotifyWearer)
 {
-    if (kID == g_kWearer)
+    if (keyID == g_kWearer)
     {
         llOwnerSay(sMsg);
     }
     else
     {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
+        llInstantMessage(keyID,sMsg);
+        if (nAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
         }
@@ -85,18 +85,7 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
     llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
     + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
-}
- 
-string Float2String(float in)
-{
-    string out = (string)in;
-    integer i = llSubStringIndex(out, ".");
-    while (~i && llStringLength(llGetSubString(out, i + 2, -1)) && llGetSubString(out, -1, -1) == "0")
-    {
-        out = llGetSubString(out, 0, -2);
-    }
-    return out;
-}
+} 
 
 key TouchRequest(key kRCPT,  integer iTouchStart, integer iTouchEnd, integer iAuth)
 {
@@ -110,6 +99,15 @@ key TouchRequest(key kRCPT,  integer iTouchStart, integer iTouchEnd, integer iAu
 
 SetAllElementsAlpha(float fAlpha)
 {
+    //loop through element list, setting all alphas
+    //integer n;
+    //integer stop = llGetListLength(g_lElements);
+    //for (n = 0; n < stop; n++)
+    //{
+    //    string element = llList2String(g_lElements, n);
+    //    SetElementAlpha(element, fAlpha);
+    //}
+
     llSetLinkAlpha(LINK_SET, fAlpha, ALL_SIDES);
     //set alphasettings of all elements to fAlpha (either 1.0 or 0.0 here)
     g_lAlphaSettings = [];
@@ -118,7 +116,7 @@ SetAllElementsAlpha(float fAlpha)
     for (n = 0; n < iStop; n++)
     {
         string sElement = llList2String(g_lElements, n);
-        g_lAlphaSettings += [sElement, Float2String(fAlpha)];
+        g_lAlphaSettings += [sElement, fAlpha];
     }
 }
 
@@ -128,7 +126,6 @@ SetElementAlpha(string element_to_set, float fAlpha)
     //root prim is 1, so start at 2
     integer n;
     integer iLinkCount = llGetNumberOfPrims();
-    string sAlpha = Float2String(fAlpha);
     for (n = 2; n <= iLinkCount; n++)
     {
         string sElement = ElementType(n);
@@ -142,11 +139,11 @@ SetElementAlpha(string element_to_set, float fAlpha)
             integer iIndex = llListFindList(g_lAlphaSettings, [sElement]);
             if (iIndex == -1)
             {
-                g_lAlphaSettings += [sElement, sAlpha];
+                g_lAlphaSettings += [sElement, fAlpha];
             }
             else
             {
-                g_lAlphaSettings = llListReplaceList(g_lAlphaSettings, [sAlpha], iIndex + 1, iIndex + 1);
+                g_lAlphaSettings = llListReplaceList(g_lAlphaSettings, [fAlpha], iIndex + 1, iIndex + 1);
             }
         }
     }
@@ -154,24 +151,22 @@ SetElementAlpha(string element_to_set, float fAlpha)
 
 SaveAlphaSettings()
 {
-    integer i = 0;
-    integer n;
-    string token;
-    string value;
-    for (; i < llGetListLength(g_lElements); i ++)
+    if (llGetListLength(g_lAlphaSettings)>0)
     {
-        token = llList2String(g_lElements, i);
-        n = llListFindList(g_lAlphaSettings, [token]);
-        token = g_sScript + token;
-        value = llList2String(g_lAlphaSettings, n + 1);
-        if (~n) llMessageLinked(LINK_SET, LM_SETTING_SAVE, token + "=" + value, NULL_KEY);
-        else llMessageLinked(LINK_SET, LM_SETTING_DELETE, token, NULL_KEY);
+        //dump list to string and do httpdb save
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lAlphaSettings, ","), NULL_KEY);
     }
+    else
+    {
+        //dump list to string and do httpdb save
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
+    }
+
 }
 
 ElementMenu(key kAv, integer iAuth)
 {
-    string sPrompt = "Pick which part of the " + CTYPE + " you would like to hide or show.\n\nChoose *Touch* if you want to select the part by directly clicking on the " + CTYPE + ".";
+    string sPrompt = "Pick which part of the collar you would like to hide or show.\n\nChoose *Touch* if you want to select the part by directly clicking on the collar.";
     g_lButtons = [];
     //loop through elements, show appropriate buttons and prompts if hidden or shown
 
@@ -253,7 +248,7 @@ integer AppLocked(key kID)
 {
     if (g_iAppLock)
     {
-        Notify(kID,"The appearance of the " + CTYPE + " is locked. You cannot access this menu now!", FALSE);
+        Notify(kID,"The appearance of the collar is locked. You cannot access this menu now!", FALSE);
         return TRUE;
     }
     else
@@ -266,9 +261,16 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         g_kWearer = llGetOwner();
+        //get dbprefix from object desc, so that it doesn't need to be hard coded, and scripts between differently-primmed collars can be identical
+        string sPrefix = llList2String(llParseString2List(llGetObjectDesc(), ["~"], []), 2);
+        if (sPrefix != "")
+        {
+            g_sDBToken = sPrefix + g_sDBToken;
+        }
+
         BuildElementList();
+
         //register menu button
         llSleep(1.0);
         llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
@@ -361,10 +363,17 @@ default
             {
                 if (llGetAlpha(ALL_SIDES) == 0.0)
                 {
-                    Notify(kID, "Hidden", FALSE);
+                    Notify(kID, "Hiden", FALSE);
                 }
             }
-            else if (iNum == COMMAND_OWNER && sStr == "runaway")
+            else if (iNum == COMMAND_OWNER && sStr == "reset")
+            {
+                SetAllElementsAlpha(1.0);
+                // no more self - resets
+                //    llResetScript();
+            }
+            //else if (iNum == COMMAND_WEARER && (sStr == "reset" || sStr == "runaway"))
+            else if ((iNum == COMMAND_WEARER || kID == llGetOwner()) && (sStr == "reset" || sStr == "runaway"))
             {
                 SetAllElementsAlpha(1.0);
                 // no more self - resets
@@ -376,20 +385,23 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            if (sToken == g_sDBToken)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                i = llListFindList(g_lAlphaSettings, [sToken]);
-                if (~i) g_lAlphaSettings = llListReplaceList(g_lAlphaSettings, [sValue], i + 1, i + 1);
-                else g_lAlphaSettings += [sToken, sValue];
-                SetElementAlpha(sToken, (float)sValue);
+                //we got the list of alphas for each element
+                g_lAlphaSettings = llParseString2List(sValue, [","], []);
+                integer n;
+                integer iStop = llGetListLength(g_lAlphaSettings);
+                for (n = 0; n < iStop; n = n + 2)
+                {
+                    string sElement = llList2String(g_lAlphaSettings, n);
+                    float fAlpha = (float)llList2String(g_lAlphaSettings, n + 1);
+                    SetElementAlpha(sElement, fAlpha);
+                }
             }
             else if (sToken == g_sAppLockToken)
             {
                 g_iAppLock = (integer)sValue;
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
         }
         else if (iNum == MENUNAME_REQUEST && sStr == g_sParentMenu)
         {
@@ -413,7 +425,7 @@ default
                 }
                 else if (sMessage == "*Touch*")
                 {
-                    Notify(kAv, "Please touch the part of the " + CTYPE + " you want to hide or show. You can press ctr+alt+T to see invisible parts.", FALSE);
+                    Notify(kAv, "Please touch the part of the collar you want to hide or show. You can press ctr+alt+T to see invisible parts.", FALSE);
                     g_kTouchID = TouchRequest(kAv, TRUE, FALSE, iAuth);
                 }
                 else

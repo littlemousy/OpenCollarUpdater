@@ -51,7 +51,7 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-string g_sDBToken = "List";
+string g_sDBToken = "spy";
 
 string UPMENU = "^";
 string g_sParentMenu = "AddOns";
@@ -70,18 +70,7 @@ Debug(string sStr)
 {
     //llOwnerSay(llGetScriptName() + ": " + sStr);
 }
-string GetScriptID()
-{
-    // strip away "OpenCollar - " leaving the script's individual name
-    list parts = llParseString2List(llGetScriptName(), ["-"], []);
-    return llStringTrim(llList2String(parts, 1), STRING_TRIM) + "_";
-}
-string PeelToken(string in, integer slot)
-{
-    integer i = llSubStringIndex(in, "_");
-    if (!slot) return llGetSubString(in, 0, i);
-    return llGetSubString(in, i + 1, -1);
-}
+
 DoReports()
 {
     Debug("doing reports");
@@ -318,36 +307,18 @@ DialogRadarSettings(key kID, integer iAuth)
     g_kDialogRadarSettingsID = Dialog(kID, sPromt, lButtons, [UPMENU], 0, iAuth);
 }
 
-integer GetOwnerChannel(key kOwner, integer iOffset)
-{
-    integer iChan = (integer)("0x"+llGetSubString((string)kOwner,2,7)) + iOffset;
-    if (iChan>0)
-    {
-        iChan=iChan*(-1);
-    }
-    if (iChan > -10000)
-    {
-        iChan -= 30000;
-    }
-    return iChan;
-}
 Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 {
+    Debug("notify " + (string)kID + " " + sMsg);
     if (kID == g_kWearer)
     {
         llOwnerSay(sMsg);
-    }
-    else if (llGetAgentSize(kID) != ZERO_VECTOR)
-    {
-        llInstantMessage(kID,sMsg);
+    } else {
+            llInstantMessage(kID,sMsg);
         if (iAlsoNotifyWearer)
         {
             llOwnerSay(sMsg);
         }
-    }
-    else // remote request
-    {
-        llRegionSayTo(kID, GetOwnerChannel(g_kWearer, 1111), sMsg);
     }
 }
 
@@ -525,7 +496,6 @@ default
         g_sSubName = llKey2Name(g_kWearer);
         g_sLoc=llGetRegionName();
         g_lOwners = [g_kWearer, g_sSubName];  // initially self-owned until we hear a db message otherwise
-        g_sDBToken = GetScriptID() + g_sDBToken;
     }
 
     listen(integer channel, string sName, key kID, string sMessage)
@@ -559,7 +529,7 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+            if(sToken == "owner" && llStringLength(sValue) > 0)
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
                 Debug("owners: " + sValue);
@@ -570,7 +540,7 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+            if(sToken == "owner" && llStringLength(sValue) > 0)
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
                 Debug("owners: " + sValue);

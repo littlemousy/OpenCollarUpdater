@@ -1,4 +1,4 @@
-﻿//OpenCollar - coupleanim1
+//OpenCollar - coupleanim1
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 //coupleanim1
 string g_sParentMenu = "Animations";
@@ -45,6 +45,7 @@ string g_sPartnerName;
 float g_fTimeOut = 20.0;//duration of anim
 //i dont think this flag is needed at all
 integer g_iTargetID; // remember the walk target to delete
+string g_sDBToken = "coupletime";
 string g_sSubAnim;
 string g_sDomAnim;
 
@@ -86,7 +87,7 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-string g_sScript;
+
 
 Debug(string sStr)
 {
@@ -100,17 +101,6 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
     + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
 } 
-
-string Float2String(float in)
-{
-    string out = (string)in;
-    integer i = llSubStringIndex(out, ".");
-    while (~i && llStringLength(llGetSubString(out, i + 2, -1)) && llGetSubString(out, -1, -1) == "0")
-    {
-        out = llGetSubString(out, 0, -2);
-    }
-    return out;
-}
 
 PartnerMenu(key kID, list kAvs, integer iAuth)
 {
@@ -229,17 +219,12 @@ StopAnims()
     g_sDomAnim = "";
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -278,7 +263,6 @@ default
 {
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         g_kWearer = llGetOwner();
         if (llGetInventoryType(CARD1) == INVENTORY_NOTECARD)
         {//card is present, start reading
@@ -303,12 +287,13 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if(sToken == g_sScript + "timeout")
+            if(sToken == g_sDBToken)
             {
                 g_fTimeOut = (float)sValue;
             }
         }
     }
+
     dataserver(key kID, string sData)
     {
         if (kID == g_kDataID)
@@ -372,6 +357,7 @@ default
             }
         }
     }
+
     on_rez(integer start)
     {
 
@@ -402,6 +388,7 @@ state nocard
             }
         }
     }
+
     on_rez(integer iParam)
     {
 
@@ -422,6 +409,8 @@ state ready
     {
         llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
     }
+
+
     on_rez(integer start)
     {
 
@@ -434,6 +423,7 @@ state ready
         }
         llResetScript();
     }
+
     link_message(integer iSender, integer iNum, string sStr, key kID)
     {
         //if you don't care who gave the command, so long as they're one of the above, you can just do this instead:
@@ -484,6 +474,7 @@ state ready
             {
                 CoupleAnimMenu(kID, iNum);
             }
+
         }
         else if (iNum == CPLANIM_PERMRESPONSE)
         {
@@ -506,7 +497,7 @@ state ready
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if(sToken == g_sScript + "timeout")
+            if(sToken == g_sDBToken)
             {
                 g_fTimeOut = (float)sValue;
             }
@@ -559,14 +550,14 @@ state ready
                 else if ((integer)sMessage > 0 && ((string)((integer)sMessage) == sMessage))
                 {
                     g_fTimeOut = (float)((integer)sMessage);
-                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "timeout=" + Float2String(g_fTimeOut), NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + (string)g_fTimeOut, NULL_KEY);
                     Notify (kAv, "Couple Anmiations play now for " + (string)llRound(g_fTimeOut) + " seconds.",TRUE);
                     CoupleAnimMenu(kAv, iAuth);
                 }
                 else if (sMessage == "endless")
                 {
                     g_fTimeOut = 0.0;
-                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "timeout=" + Float2String(g_fTimeOut), NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + (string)g_fTimeOut, NULL_KEY);
                     Notify (kAv, "Couple Anmiations play now for ever. Use the menu or type *stopcouples to stop them again.",TRUE);
                 }
                 else
@@ -586,100 +577,108 @@ state ready
             }
         }
     }
-    not_at_target()
-    {
-        //this might make us chase the partner.  we'll see.  that might not be bad
-        llTargetRemove(g_iTargetID);
-        MoveToPartner();
-    }
-    at_target(integer tiNum, vector targetpos, vector ourpos)
-    {
-        llTargetRemove(tiNum);
-        llStopMoveToTarget();
-        AlignWithPartner();
-        //we've arrived.  let's play the anim and spout the text
-        g_sSubAnim = llList2String(g_lAnimSettings, g_iCmdIndex * 4);
-        g_sDomAnim = llList2String(g_lAnimSettings, g_iCmdIndex * 4 + 1);
-        llMessageLinked(LINK_SET, ANIM_START, g_sSubAnim, NULL_KEY);
-        llMessageLinked(LINK_SET, CPLANIM_START, g_sDomAnim, NULL_KEY);
-        string text = llList2String(g_lAnimSettings, g_iCmdIndex * 4 + 3);
-        if (text != "")
+
+        not_at_target()
         {
-            text = StrReplace(text, "_SELF_", FirstName(llKey2Name(g_kWearer)));
-            text = StrReplace(text, "_PARTNER_", FirstName(g_sPartnerName));
-            PrettySay(text);
+            //this might make us chase the partner.  we'll see.  that might not be bad
+            llTargetRemove(g_iTargetID);
+            MoveToPartner();
         }
-        llSetTimerEvent(g_fTimeOut);
-    }
-    timer()
-    {
-        StopAnims();
-        llSetTimerEvent(0.0);
-    }
-    sensor(integer iNum)
-    {
-        Debug(g_sSensorMode);
-        if (g_sSensorMode == "menu")
+
+        at_target(integer tiNum, vector targetpos, vector ourpos)
         {
-            g_lPartners = [];
-            list kAvs;//just used for menu building
-            integer n;
-            for (n = 0; n < iNum; n++)
+            llTargetRemove(tiNum);
+            llStopMoveToTarget();
+            AlignWithPartner();
+            //we've arrived.  let's play the anim and spout the text
+            g_sSubAnim = llList2String(g_lAnimSettings, g_iCmdIndex * 4);
+            g_sDomAnim = llList2String(g_lAnimSettings, g_iCmdIndex * 4 + 1);
+            llMessageLinked(LINK_SET, ANIM_START, g_sSubAnim, NULL_KEY);
+            llMessageLinked(LINK_SET, CPLANIM_START, g_sDomAnim, NULL_KEY);
+
+            string text = llList2String(g_lAnimSettings, g_iCmdIndex * 4 + 3);
+            if (text != "")
             {
-                g_lPartners += [llDetectedKey(n), llDetectedName(n)];
-                kAvs += [llDetectedName(n)];
+                text = StrReplace(text, "_SELF_", FirstName(llKey2Name(g_kWearer)));
+                text = StrReplace(text, "_PARTNER_", FirstName(g_sPartnerName));
+                PrettySay(text);
             }
-            PartnerMenu(g_kCmdGiver, kAvs, g_iCmdAuth);
+            llSetTimerEvent(g_fTimeOut);
         }
-        else if (g_sSensorMode == "chat")
+
+        timer()
         {
-            //loop through detected avs, seeing if one matches g_sTmpName
-            integer n;
-            for (n = 0; n < iNum; n++)
+            StopAnims();
+            llSetTimerEvent(0.0);
+        }
+
+        sensor(integer iNum)
+        {
+            Debug(g_sSensorMode);
+            if (g_sSensorMode == "menu")
             {
-                string sName = llDetectedName(n);
-                if (StartsWith(llToLower(sName), llToLower(g_sTmpName)) || llToLower(sName) == llToLower(g_sTmpName))
+                g_lPartners = [];
+                list kAvs;//just used for menu building
+                integer n;
+                for (n = 0; n < iNum; n++)
                 {
-                    g_kPartner = llDetectedKey(n);
-                    g_sPartnerName = sName;
-                    string sCommand = llList2String(g_lAnimCmds, g_iCmdIndex);
-                    //added to stop eventual still going animations
-                    StopAnims();
-                    llMessageLinked(LINK_SET, CPLANIM_PERMREQUEST, sCommand, g_kPartner);
-                    llOwnerSay("Offering to " + sCommand + " " + g_sPartnerName + ".");
-                    return;
+                    g_lPartners += [llDetectedKey(n), llDetectedName(n)];
+                    kAvs += [llDetectedName(n)];
+                }
+                PartnerMenu(g_kCmdGiver, kAvs, g_iCmdAuth);
+            }
+            else if (g_sSensorMode == "chat")
+            {
+                //loop through detected avs, seeing if one matches g_sTmpName
+                integer n;
+                for (n = 0; n < iNum; n++)
+                {
+                    string sName = llDetectedName(n);
+                    if (StartsWith(llToLower(sName), llToLower(g_sTmpName)) || llToLower(sName) == llToLower(g_sTmpName))
+                    {
+                        g_kPartner = llDetectedKey(n);
+                        g_sPartnerName = sName;
+                        string sCommand = llList2String(g_lAnimCmds, g_iCmdIndex);
+                        //added to stop eventual still going animations
+                        StopAnims();
+                        llMessageLinked(LINK_SET, CPLANIM_PERMREQUEST, sCommand, g_kPartner);
+                        llOwnerSay("Offering to " + sCommand + " " + g_sPartnerName + ".");
+                        return;
+                    }
+                }
+                //if we got to this point, then no one matched
+                llInstantMessage(g_kCmdGiver, "Could not find '" + g_sTmpName + "' to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
+            }
+        }
+
+        no_sensor()
+        {
+            if (g_sSensorMode == "chat")
+            {
+                llInstantMessage(g_kCmdGiver, "Could not find '" + g_sTmpName + "' to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
+            }
+            else if (g_sSensorMode == "menu")
+            {
+                llInstantMessage(g_kCmdGiver, "Could not find anyone nearby to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
+                CoupleAnimMenu(g_kCmdGiver, g_iCmdAuth);
+            }
+        }
+
+        changed(integer iChange)
+        {
+            if (iChange & CHANGED_INVENTORY)
+            {
+                if (llGetInventoryKey(CARD1) != g_kCardID1)
+                {
+                    //because notecards get new uuids on each save, we can detect if the notecard has changed by seeing if the current uuid is the same as the one we started with
+                    //just switch states instead of restarting, so we can preserve any settings we may have gotten from db
+                    state default;
+                }
+                if (llGetInventoryKey(CARD2) != g_kCardID1)
+                {
+                    state default;
                 }
             }
-            //if we got to this point, then no one matched
-            llInstantMessage(g_kCmdGiver, "Could not find '" + g_sTmpName + "' to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
         }
+
     }
-    no_sensor()
-    {
-        if (g_sSensorMode == "chat")
-        {
-            llInstantMessage(g_kCmdGiver, "Could not find '" + g_sTmpName + "' to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
-        }
-        else if (g_sSensorMode == "menu")
-        {
-            llInstantMessage(g_kCmdGiver, "Could not find anyone nearby to " + llList2String(g_lAnimCmds, g_iCmdIndex) + ".");
-            CoupleAnimMenu(g_kCmdGiver, g_iCmdAuth);
-        }
-    }
-    changed(integer iChange)
-    {
-        if (iChange & CHANGED_INVENTORY)
-        {
-            if (llGetInventoryKey(CARD1) != g_kCardID1)
-            {
-                //because notecards get new uuids on each save, we can detect if the notecard has changed by seeing if the current uuid is the same as the one we started with
-                //just switch states instead of restarting, so we can preserve any settings we may have gotten from db
-                state default;
-            }
-            if (llGetInventoryKey(CARD2) != g_kCardID1)
-            {
-                state default;
-            }
-        }
-    }
-}

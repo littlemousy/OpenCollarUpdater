@@ -1,8 +1,42 @@
-﻿//OpenCollar - rlvex
-//Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life. See "OpenCollar License" for details.
+//OpenCollar - rlvex
+//Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 
-key g_kLMID;//store the request id here when we look up a LM
-string CTYPE = "collar";
+//********************
+//stores owner info worng
+//chekc default stornage
+//fix names for people
+
+
+
+
+
+///****************
+//
+/*
+going to do a binary with exceptions default will be all on for owners
+ability to change it for each owner
+able to add other people.
+
+will need a default settings for owners
+list of people with settings
+secowner settings
+
+in the order of how they were added to the viewer
+1.0:
+tplure
+1.01:
+most chat
+
+1.15:
+accepttp
+
+1,19:
+recvemote
+
+*/
+
+key g_kLMID;//store the request id here when we look up  a LM
+
 key g_kMenuID;
 key g_kSensorMenuID;
 key g_kPersonMenuID;
@@ -18,6 +52,8 @@ list g_lSecOwners;
 
 string g_sParentMenu = "RLV";
 string g_sSubMenu = "Exceptions";
+string g_sDBToken = "rlvex";
+string g_sDBToken2 = "rlvexlist";
 
 //statics to compare
 integer OWNER_DEFUALT = 63;//1+2+4+8+16+32;//all on
@@ -74,14 +110,8 @@ string TURNOFF = "Enforce";
 string DESTINATIONS = "Destinations";
 
 integer g_iRLVOn=FALSE;
-integer g_iAuth = 0;
 
 key g_kWearer;
-key g_kHTTPID = NULL_KEY;
-key g_kTmpKey = NULL_KEY;
-key g_kTestKey = NULL_KEY;
-string g_sTmpName = "";
-string g_sUserCommand = "";
 
 //MESSAGE MAP
 //integer COMMAND_NOAUTH = 0;
@@ -92,7 +122,7 @@ integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
 integer COMMAND_RLV_RELAY = 507;
 
-//integer SEND_IM = 1000; deprecated. each script should send its own IMs now. This is to reduce even the tiny bt of lag caused by having IM slave descripts
+//integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave descripts
 integer POPUP_HELP = 1001;
 
 integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
@@ -122,28 +152,22 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-integer FIND_AGENT = -9005;
+//string UPMENU = "?";
+//string MORE = "?";
 string UPMENU = "^";
-
-key REQUEST_KEY;
-string g_sScript;
+//string MORE = ">";
 
 Debug(string sMsg)
 {
-   //llOwnerSay(llGetScriptName() + ": " + sMsg);
+//    llOwnerSay(llGetScriptName() + ": " + sMsg);
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -152,22 +176,22 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
     key kID = llGenerateKey();
-    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|"
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
     + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
-}
+} 
 
 Menu(key kID, string sWho, integer iAuth)
 {
     if (!g_iRLVOn)
     {
-        Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+        Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
         llMessageLinked(LINK_SET, iAuth, "menu RLV", kID);
         return;
     }
     
-    list lButtons = ["Owner", "Secowner", "Other"];
-    string sPrompt = "Set exceptions for the restrictions for RLV commands. Exceptions can be changed for owners, secowners and specific ones for other people. Use \"Other\" to set the specific restrictions for them later.";
+    list lButtons = ["Owner", "Secowners", "Other", "Add"];
+    string sPrompt = "Set exceptions for the restrictions for RLV commands. Exceptions can be changed for owners, secowners and specific ones for other people. Add others with the \"Add\" button, use \"Other\" to set the specific restrictions for them later.";
     g_kMenuID = Dialog(kID, sPrompt, lButtons, [UPMENU], 0, iAuth);
 }
 
@@ -180,8 +204,10 @@ PersonMenu(key kID, list lPeople, string sType, integer iAuth)
         return;
     }
     //g_sRequestType = sType;
-    string sPrompt = "Choose the person to change settings on. Add others with the \"Add\" button";
-    list lButtons = ["Add"];
+    string sPrompt = "Choose the person to change settings on.";
+    list lButtons;
+    //build a button list with the dances, and "More"
+    //get number of secowners
     integer iNum= llGetListLength(lPeople);
     integer n;
     for (n=1; n <= iNum/2; n = n + 1)
@@ -202,27 +228,47 @@ ExMenu(key kID, string sWho, integer iAuth)
     Debug("ExMenu for :"+sWho);
     if (!g_iRLVOn)
     {
-        Notify(kID, "RLV features are now disabled in this " + CTYPE + ". You can enable those in RLV submenu. Opening it now.", FALSE);
+        Notify(kID, "RLV features are now disabled in this collar. You can enable those in RLV submenu. Opening it now.", FALSE);
         llMessageLinked(LINK_SET, iAuth, "menu RLV", kID);
         return;
     }
     integer iExSettings = 0;
-    integer iInd;
-    if (sWho == "owner" || ~llListFindList(g_lOwners, [sWho]))
+    if (sWho == "owner")
     {
         iExSettings = g_iOwnerDefault;
     }
-    else if (sWho == "secowner" || ~llListFindList(g_lSecOwners, [sWho]))
+    else if (sWho == "secowners")
     {
         iExSettings = g_iSecOwnerDefault;
     }
-    if (~iInd = llListFindList(g_lSettings, [sWho])) // replace deefault with custom
+    else if (llListFindList(g_lSettings, [sWho]) != -1)
     {
-        iExSettings = llList2Integer(g_lSettings, iInd + 1);
+        iExSettings = llList2Integer(g_lSettings, llListFindList(g_lSettings, [sWho])+1);
     }
-    string sPrompt = "\nCurrent Settings: ";
-    if (sWho != "owner" && sWho != "secowner") sPrompt = "[Defaults] will remove this person from the \"Others\" list." + sPrompt;
+    else if (llListFindList(g_lOwners, [sWho]) != -1)
+    {
+        iExSettings = g_iOwnerDefault;
+    }
+    else if (llListFindList(g_lSecOwners, [sWho]) != -1)
+    {
+        iExSettings = g_iSecOwnerDefault;
+    }
+    
+//    list lButtons = [];
+//    string sPrompt = "This plug is in beta. Right now it set exceptions for all primary owners for all RLV cmds at all times. Later you will be  able to change them for owners, secowners and then set specific ones for other people.";
+//    kMenuID = Dialog(kID, sPrompt, lButtons, [UPMENU], 0);
+// }
+
+// /* use this later
+
+
+    //build sPrompt showing s_Current settings
+    //make enable/disable lButtons
+    //    string sPrompt = "Pick an option";
+    //    sPrompt += " (Menu will expire in " + (string)g_iTimeOut + " seconds.)";
+    string sPrompt = "Defaults will remove all exceptions for this person if they are not an Owner or Secowner otherwise it will set them to the defaults.\nCurrent Settings: ";
     list lButtons;
+
     integer n;
     integer iStop = llGetListLength(g_lRLVcmds);
     for (n = 0; n < iStop; n++)
@@ -231,14 +277,15 @@ ExMenu(key kID, string sWho, integer iAuth)
         string sCmd = llList2String(g_lRLVcmds, n);
         string sPretty = llList2String(g_lPrettyCmds, n);
         string sDesc = llList2String(g_lDescriptions, n);
+
         if (iExSettings & llList2Integer(g_lBinCmds, n))
         {
-            lButtons += [TURNOFF + " " + sPretty];
+            lButtons += [TURNOFF + " " + llList2String(g_lPrettyCmds, n)];
             sPrompt += "\n" + sPretty + " = Exempted (" + sDesc + ")";
         }
         else
         {
-            lButtons += [TURNON + " " + sPretty];
+            lButtons += [TURNON + " " + llList2String(g_lPrettyCmds, n)];
             sPrompt += "\n" + sPretty + " = Enforced (" + sDesc + ")";
         }
     }
@@ -250,15 +297,23 @@ ExMenu(key kID, string sWho, integer iAuth)
     {
         lButtons += ["List"];
     }
-    else if (sWho == "secowner")
+    else if (sWho == "secowners")
     {
         lButtons += ["List"];
     }
     Debug(sPrompt);
     Debug((string)llStringLength(sPrompt));
+    //    lButtons += [UPMENU];
+    //    lButtons = RestackMenu(buttons);
+    //    menuchannel = -llRound(llFrand(9999999.0)) -99999;
+    //    g_iListener = llListen(menuchannel, "", kID, "");
+    //    llSetTimerEvent(g_iTimeOut);
+    //    llDialog(kID, sPrompt, lButtons, menuchannel);
     key kTmp = Dialog(kID, sPrompt, lButtons, ["Defaults", UPMENU], 0, iAuth);
     g_lExMenus = [kTmp, sWho] + g_lExMenus;
 }
+// */
+
 
 UpdateSettings()
 {
@@ -268,29 +323,27 @@ UpdateSettings()
 
 SaveDefaults()
 {
-    // these are lists of rlv exceptions, not to be confused with auth_owner listings
     //save to DB
-    if (OWNER_DEFUALT == g_iOwnerDefault && SECOWNER_DEFUALT == g_iSecOwnerDefault)
+    if (OWNER_DEFUALT == g_iOwnerDefault)
     {
-        Debug("Defaults");
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "owner", NULL_KEY);
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "secowner", NULL_KEY);
-        return;
+        if (SECOWNER_DEFUALT == g_iSecOwnerDefault)
+        {
+            llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
+            return;
+        }
     }
-    Debug("ownerdef: " + (string)g_iOwnerDefault + "\nsecdef: " + (string)g_iSecOwnerDefault);
-    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "owner=" + (string)g_iOwnerDefault, NULL_KEY);
-    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "secowner=" + (string)g_iSecOwnerDefault, NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String([g_iOwnerDefault, g_iSecOwnerDefault], ","), NULL_KEY);
 }
 SaveSettings()
 {
     //save to local settings
-    if (llGetListLength(g_lSettings))
+    if (llGetListLength(g_lSettings)>0)
     {
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "List=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken2 + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
     }
     else
     {
-        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "List", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken2, NULL_KEY);
     }
 }
 
@@ -299,8 +352,7 @@ ClearSettings()
     //clear settings list
     g_lSettings = [];
     //remove tpsettings from DB... now done by httpdb itself
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "owner", NULL_KEY);
-    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sScript + "secowner", NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     //main RLV script will take care of sending @clear to viewer
     //avoid race conditions
     llSleep(1.0);
@@ -317,61 +369,27 @@ MakeNamesList()
         AddName(sKey);
     }
 }
-/*Name2Key(string sName)
-{
-    // Variant of N2K, uses SL's internal search engine instead of external databases
-    string url = "http://www.w3.org/services/html2txt?url=";
-    string escape = "http://vwrsearch.secondlife.com/client_search.php?session=00000000-0000-0000-0000-000000000000&q=";
-    g_kHTTPID = llHTTPRequest(url + llEscapeURL(escape) + llEscapeURL(sName), [], "");
-}*/
-
-FetchAvi(integer auth, string type, string name, key user)
-{
-    if (name == "") name = " ";
-    string out = llDumpList2String(["getavi_", g_sScript, user, auth, type, name], "|");
-    integer i = 0;
-    list src = g_lNames;
-    list exclude; // build list of existing-listed keys to exclude from name search
-    for (; i < llGetListLength(src); i += 2)
-    {
-        exclude += [llList2String(src, i)];
-    }
-    if (llGetListLength(exclude))
-        out += "|" + llDumpList2String(exclude, ",");
-    llMessageLinked(LINK_THIS, FIND_AGENT, out, REQUEST_KEY = llGenerateKey());
-}
-
 AddName(string sKey)
 {
-    if (~llListFindList(g_lNames, [sKey])) jump AddDone; // prevent dupes
-    integer iInd = llListFindList(g_lOwners, [sKey]);
-    /*if (g_kHTTPID) // Name2Key
+    integer iIndex = llListFindList(g_lOwners, [sKey]);
+    if (iIndex != -1)
     {
-        g_kHTTPID = NULL_KEY;
-        g_lNames += [sKey, g_sTmpName];
-        if (g_kTmpKey != NULL_KEY) Notify(g_kTmpKey, g_sTmpName + " has been successfully added to Exceptions User List.", FALSE);
-    }*/
-    if (~iInd)
-    {
-        g_lNames += [sKey, llList2String(g_lOwners, iInd + 1)];
+        g_lNames += [sKey, llList2String(g_lOwners, iIndex+1)];
     }
-    else if (~iInd = llListFindList(g_lSecOwners, [sKey]))
+    else
     {
-        g_lNames += [sKey, llList2String(g_lSecOwners, iInd + 1)];
+        iIndex = llListFindList(g_lSecOwners, [sKey]);
+        if (iIndex != -1)
+        {
+            g_lNames += [sKey, llList2String(g_lSecOwners, iIndex+1)];
+        }
+        else
+        {
+            //lookup and put the uuid for hte request in for now
+            g_lNames += [sKey, (string)llRequestAgentData(sKey, DATA_NAME) ];
+            llSleep(1);
+        }
     }
-    else if((key)sKey)
-    {
-        //lookup and put the uuid for the request in for now
-        g_lNames += [sKey, g_kTestKey = llRequestAgentData(sKey, DATA_NAME)];
-        // llSleep(1); --- unnecessary, as llRequestAgentData will induce a 0.1 second sleep
-        llSetTimerEvent(0.5); // if not a valid avi uuid, we'll revert the names list
-        return; // timer event will need (& reset) the Tmp values, & resend usercommands for this person
-    }
-    @AddDone;
-    if (g_sUserCommand != "") UserCommand(g_iAuth, sKey + ":" + g_sUserCommand, g_kTmpKey); // continue processing commands
-    g_iAuth = 0;
-    g_kTmpKey = g_kTestKey = NULL_KEY;
-    g_sTmpName = g_sUserCommand = "";
 }
 
 SetOwnersExs(string sVal)
@@ -392,7 +410,7 @@ SetOwnersExs(string sVal)
             sCmd = [];
             string sTmpOwner = llList2String(g_lOwners, n);
             if (llListFindList(g_lSettings, [sTmpOwner]) != -1)
-            {
+            { 
                 for (i = 0; i<iStop; i++)
                 {
                     if (g_iOwnerDefault & llList2Integer(g_lBinCmds, i) )
@@ -431,7 +449,7 @@ SetAllExs(string sVal)
             sCmd = [];
             string sTmpOwner = llList2String(g_lOwners, n);
             if (llListFindList(g_lSettings, [sTmpOwner]) == -1)
-            {
+            { 
                 for (i = 0; i<iStop; i++)
                 {
                     if (g_iOwnerDefault & llList2Integer(g_lBinCmds, i) )
@@ -461,7 +479,7 @@ SetAllExs(string sVal)
             sCmd = [];
             string sTmpOwner = llList2String(g_lSecOwners, n);
             if (llListFindList(g_lSettings, [sTmpOwner]) == -1)
-            {
+            { 
                 for (i = 0; i<iStop; i++)
                 {
                     if (g_iSecOwnerDefault & llList2Integer(g_lBinCmds, i) )
@@ -516,158 +534,160 @@ ClearEx()
 
 integer UserCommand(integer iNum, string sStr, key kID)
 {
-    if (iNum != COMMAND_OWNER) return FALSE; // Only Primary Owners
-    if (sStr == "runaway") llResetScript();
-    string sLower = llToLower(sStr);
-    if (sLower == "ex" || sLower == "menu " + llToLower(g_sSubMenu))
-    {
-        Menu(kID, "", iNum);
-        jump UCDone;
+    if (iNum < COMMAND_OWNER || iNum > COMMAND_WEARER) return FALSE;
+    if ((sStr == "reset" || sStr == "runaway") && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER))
+    {   //clear db, reset script
+        //llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
+        //llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sExToken, NULL_KEY);
+        //SetOwnersExs("rem"); // should not be needed
+        llResetScript();
     }
-    list lParts = llParseString2List(sStr, [" "], []); // ex,add,first,last at most
-    integer iInd = llGetListLength(lParts);
-    if (iInd < 1 || iInd > 4 || llList2String(lParts, 0) != "ex") return FALSE;
-    lParts = llDeleteSubList(lParts, 0, 0); // no longer need the "ex"
-    iInd = llGetListLength(lParts);
-    string sCom = llList2String(lParts, 0);
-    if (iInd == 1) // handle requests 4 menus first
-    {
-        if (sCom == "owner") ExMenu(kID, "owner", iNum);
-        else if (sCom == "secowner") ExMenu(kID, "secowner", iNum);
-        else if (sCom == "other") PersonMenu(kID, g_lNames, "", iNum);
-        else if (sCom == "add")
-        {
-            FetchAvi(iNum, "ex", "", kID);
-            jump UCDone;
-        }
-        if (!llSubStringIndex(sCom, ":")) jump UCDone;// not done if we received a 1-who 1-exception case
-    }
-    string sVal = llList2String(lParts, 1);
-    if (sCom == "add") // request to add specified user to names list - must be "add First Last" or "add uuid"
-    {
-        if ((key)sVal) AddName(sVal);
-        else FetchAvi(iNum, "ex", sVal, kID);
-        jump UCDone;
-    }
-    // anything else should be <prefix>ex user:command=value & may be strided with commas
-    // if user is unknown to us, we'll re-run undone commands after they are sucessfully added, to prevent errors
-    lParts = llParseString2List(llList2String(lParts, 0), [":"], []);
-    iInd = llGetListLength(lParts) - 1;
-    list lCom;
-    string sWho;
-    integer bChange;
-    integer iRLV;
-    integer iBin;
-    integer iSet;
-    integer iN2K;
-    integer iNames;
-    integer iL = 0;
-    integer iC = 0;
-    for (; iL < iInd; iL += 2) // cycle through users
-    {
-        // Let's get a uuid to work with, if who is an avatar. This enables users to type in names OR keys for chat commands.
-        sWho = llList2String(lParts, iL);
-        sLower = llToLower(sWho);
-        iNames = llListFindList(g_lNames, [sWho]);
-        // let's make certain that we carry unprocessed requests thru AddNames
-        g_sUserCommand = "ex " + llDumpList2String(lParts, ":");
-        if (sLower == "clear" || sLower == "owner" || sLower == "secowner") {}
-        else if ((key)sWho)
-        {
-            if (iNames == -1)
+    else if (llToLower(sStr) == "ex" || sStr == "menu " + g_sSubMenu) Menu(kID, "", iNum);
+    else if (llToLower(sStr) == "ex " + "owner") ExMenu(kID, "owner", iNum);
+    else if (llToLower(sStr) == "ex " + "secowners") ExMenu(kID, "secowners", iNum);
+    else if (llToLower(sStr) == "ex " + "other") PersonMenu(kID, g_lNames, "", iNum);
+    else
+    {                //do simple pass through for chat commands
+
+        //since more than one RLV command can come on the same line, loop through them
+        list items = llParseString2List(sStr, [","], []);
+        integer n;
+        integer iStop = llGetListLength(items);
+        integer iChange = FALSE;//set this to true if we see a setting that concerns us
+        for (n = 0; n < iStop; n++)
+        {   //split off the parameters (anything after a : or =)
+            //and see if the thing being set concerns us
+            string sThisItem = llList2String(items, n);
+            list lParts = llParseString2List(sThisItem, ["=", ":"], []);
+            string sBehavior = llList2String(lParts, 0);
+            integer iRLVIndex = llListFindList(g_lRLVcmds, [sBehavior]);
+            if (iRLVIndex != -1)
             {
-                g_iAuth = iNum;
-                g_kTmpKey = kID;
-                AddName(sWho);
-                jump UCDone;
+                string sParam = llList2String(lParts, 2);
+                if(sParam != "")
+                {
+                    //this is a behavior that we handle.
+                    //filter commands from wearer, if wearer is not owner
+                    if (iNum != COMMAND_OWNER)
+                    {
+                        llOwnerSay("Sorry, but RLV Exceptions commands may only be given by owner.");
+                        return TRUE;
+                    }
+                    //chaing  for ex
+                    string sWho = llList2String(lParts, 1);
+                    integer iIndex = llListFindList(g_lSettings, [sWho]);
+                    if (sParam == "n" || sParam == "add")
+                    {
+                        if (sWho == "owner")
+                        {
+                            g_iOwnerDefault = g_iOwnerDefault | llList2Integer(g_lBinCmds, iRLVIndex);
+                            iChange = iChange | 1;
+                        }
+                        else if (sWho == "secowners")
+                        {
+                            g_iSecOwnerDefault = g_iSecOwnerDefault | llList2Integer(g_lBinCmds, iRLVIndex);
+                            iChange = iChange | 1;
+                        }
+                        else if (iIndex == -1)
+                        {   //we don't alread have this person with a setting so we can just set it equal to the value of the command
+                            if((key)sWho)
+                            {
+                                g_lSettings = [sWho, llList2Integer(g_lBinCmds, iRLVIndex)] + g_lSettings;
+                                AddName(sWho);//should add to name list
+                                iChange = iChange | 2;
+                            }
+                        }
+                        else
+                        {   //we already have a setting for this option.  update it.
+                            integer iTmp = llList2Integer(g_lSettings, iIndex + 1);
+                            iTmp = iTmp | llList2Integer(g_lBinCmds, iRLVIndex);
+                            g_lSettings = llListReplaceList(g_lSettings, [sWho, iTmp], iIndex, iIndex + 1);
+                            iChange = iChange | 2;
+                        }
+                    }
+                    else if (sParam == "y" || sParam == "rem")
+                    {
+                        if (sWho == "owner")
+                        {
+                            g_iOwnerDefault = g_iOwnerDefault & ~llList2Integer(g_lBinCmds, iRLVIndex);
+                            iChange = iChange | 1;
+                        }
+                        else if (sWho == "secowners")
+                        {
+                            g_iSecOwnerDefault = g_iSecOwnerDefault & ~llList2Integer(g_lBinCmds, iRLVIndex);
+                            iChange = iChange | 1;
+                        }
+                        else if (iIndex == -1)
+                        {   //we don't alread have this person with a setting so we can just set it equal 0
+                            //we will only get here if someone types it.
+                            if((key)sWho)
+                            {
+                                integer iTmp = 0;
+                                if (llListFindList(g_lOwners, [sWho]) == -1)
+                                {
+                                    iTmp = g_iOwnerDefault;
+                                }
+                                else if (llListFindList(g_lSecOwners, [sWho]) == -1)
+                                {
+                                    iTmp = g_iSecOwnerDefault;
+                                }
+                                iTmp = iTmp & ~llList2Integer(g_lBinCmds, iRLVIndex);
+                                g_lSettings = [sWho, iTmp] + g_lSettings;
+                                AddName(sWho);// add person to name list
+                                iChange = iChange | 2;
+                            }
+                        }
+                        else
+                        {   //we already have a setting for this option.  update it.
+                            integer iTmp = llList2Integer(g_lSettings, iIndex + 1);
+                            iTmp = iTmp & ~llList2Integer(g_lBinCmds, iRLVIndex);
+                            g_lSettings = llListReplaceList(g_lSettings, [sWho, iTmp], iIndex, iIndex + 1);
+                            iChange = iChange | 2;
+                        }
+                    }
+                    //iChange = TRUE;
+                }
             }
-            // else it is a uuid & is in list already, so we don't want to alter it
-        }
-        else if (~iNames) sWho = llList2String(g_lNames, iNames - 1); // name used & in list
-        else // This who is (hopefully) a username & doesn't exist in our others list, yet.
-        {
-            Notify(kID, "Sorry, but you must first add " + sWho + " to the list with <prefix>ex add " + sWho, FALSE);
-            jump nextwho;
-        }
-        // okay, now we have a key for sWho (if avatar) & they are in g_lNames - this will deliver all settings to the right places
-        g_sUserCommand = "";
-        lCom = llParseString2List(llToLower(llList2String(lParts, iL + 1)), [","], []);
-        sCom = llList2String(lCom, 0);
-        if (llGetSubString(sCom, 0, 3) == "all=") // should be the only entry for this Who if so
-        {
-            lCom = []; // convert all rlvcmds to a strided list of "cmd1=x,cmd2=x" etc
-            sVal = llGetSubString(sCom, 3, -1);
-            for (iC = 0; iC < llGetListLength(g_lRLVcmds); iC++)
-            {
-                lCom += [llList2String(g_lRLVcmds, iC) + sVal];
-            }
-        }
-        for (iC = 0; iC < llGetListLength(lCom); iC++) // cycle through strided entries
-        {
-            sCom = llList2String(lCom, iC);
-            if (sCom == "clear")
+            else if (sBehavior == "clear")
             {
                 //ClearSettings();
-                // do we want anything here this is for excpetions
-                jump nextcom;
+                // do we wnat anything here this is for excpetions
             }
-            if (~iNames = llSubStringIndex(sCom, "="))
+            else if (sBehavior == "defaults")
             {
-                sVal = llGetSubString(sCom, iNames + 1, -1);
-                sCom = llGetSubString(sCom, 0, iNames -1);
+                string sWho = llList2String(lParts, 1);
+                if (sWho == "owner")
+                {
+                    g_iOwnerDefault = OWNER_DEFUALT;
+                    iChange = iChange | 1;
+                }
+                else if (sWho == "secowners")
+                {
+                    g_iSecOwnerDefault = SECOWNER_DEFUALT;
+                    iChange = iChange | 1;
+                }
+                else
+                {
+                    integer iIndex = llListFindList(g_lSettings, [sWho]);
+                    Debug("SettingsIndex:"+(string)iIndex+" name:"+llList2String(g_lSettings, iIndex));
+                    if (iIndex != -1)
+                    {
+                        g_lSettings = llDeleteSubList(g_lSettings, iIndex, iIndex + 1);
+                        iIndex = llListFindList(g_lNames, [sWho]);
+                        Debug("NamesIndex:"+(string)iIndex+" name:"+llList2String(g_lNames, iIndex));
+                        g_lNames = llDeleteSubList(g_lNames, iIndex, iIndex + 1);//should remove the name from this list too
+                        iChange = iChange | 2;
+                    }
+                }
             }
-            else sVal = "";
-            if (sVal == "exempt" || sVal == "add") sVal = "n"; // conversions
-            else if (sVal == "enforce" || sVal == "rem") sVal = "y";
-            iRLV = llListFindList(g_lRLVcmds, [sCom]);
-            if (iRLV == -1 && sCom != "defaults") jump nextcom; // invalid request
-            iBin = llList2Integer(g_lBinCmds, iRLV);
-            if (sWho == "owner")
-            {
-                if (sCom == "defaults") g_iOwnerDefault = OWNER_DEFUALT;
-                else if (sVal == "n") g_iOwnerDefault = g_iOwnerDefault | iBin;
-                else if (sVal == "y") g_iOwnerDefault = g_iOwnerDefault & ~iBin;
-                bChange = bChange | 1;
-                jump nextcom;
-            }
-            else if (sWho == "secowner")
-            {
-                if (sCom == "defaults") g_iSecOwnerDefault = SECOWNER_DEFUALT;
-                else if (sVal == "n") g_iSecOwnerDefault = g_iSecOwnerDefault | iBin;
-                else if (sVal == "y") g_iSecOwnerDefault = g_iSecOwnerDefault & ~iBin;
-                bChange = bChange | 1;
-                jump nextcom;
-            }
-            iNames = llListFindList(g_lSettings, [sWho]);
-            if (sCom == "defaults")
-            {
-                if (~iNames) g_lSettings = llDeleteSubList(g_lSettings, iNames, iNames + 1);
-                if (~iNames = llListFindList(g_lNames, [sWho])) g_lNames = llDeleteSubList(g_lNames, iNames, iNames + 1);
-                bChange = bChange | 2;
-                jump nextcom;
-            }
-            if (~iNames) iSet = llList2Integer(g_lSettings, iNames + 1);
-            else if (~llListFindList(g_lOwners, [sWho])) iSet = g_iOwnerDefault;
-            else if (~llListFindList(g_lSecOwners, [sWho])) iSet = g_iSecOwnerDefault;
-            else iSet = 0;
-            if (sVal == "n") iSet = iSet | iBin;
-            else if (sVal == "y") iSet = iSet & ~iBin;
-            else jump nextcom; // invalid setting param
-            if (~iNames) g_lSettings = llListReplaceList(g_lSettings, [iSet], iNames + 1, iNames + 1);
-            else g_lSettings += [sWho, iSet];
-            bChange = bChange | 2;
-            @nextcom;
-            Debug("processed " + sWho + ":" + sCom + "=" + sVal);
         }
-        @nextwho;
-        if (bChange)
+        if (iChange)
         {
             UpdateSettings();
-            if(bChange & 1) SaveDefaults();
-            if(bChange & 2) SaveSettings();
+            if(iChange & 1) SaveDefaults();
+            if(iChange & 2) SaveSettings();
         }
     }
-    @UCDone;
     return TRUE;
 }
 
@@ -680,10 +700,7 @@ default
 
     state_entry()
     {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
         g_kWearer = llGetOwner();
-        g_kTmpKey = NULL_KEY;
-        g_sTmpName = "";
         //llSleep(1.0);
         //llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
         //llMessageLinked(LINK_SET, LM_SETTING_REQUEST, g_sDBToken, NULL_KEY);
@@ -704,21 +721,35 @@ default
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
+            if (sToken == g_sDBToken)
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "owner") g_iOwnerDefault = (integer)sValue;
-                else if (sToken == "secowner") g_iSecOwnerDefault = (integer)sValue;
-                else if (sToken == "List")
-                {
-                    g_lSettings = llParseString2List(sValue, [","], []);
-                    MakeNamesList();
-                }
+                list lTmp = llParseString2List(sValue, [","], []);
+                g_iOwnerDefault = llList2Integer(lTmp, 0);
+                g_iSecOwnerDefault = llList2Integer(lTmp, 1);
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
-            else if (sToken == "auth_owner") g_lOwners = llParseString2List(sValue, [","], []);
-            else if (sToken == "auth_secowner") g_lSecOwners = llParseString2List(sValue, [","], []);
+            else if (sToken == g_sDBToken2)
+            {
+                //throw away first element
+                //everything else is real settings (should be even number)
+                g_lSettings = llParseString2List(sValue, [","], []);
+                MakeNamesList();
+                //UpdateSettings();
+                //do it when all the settings are done
+            }
+            else if (sToken == "owner")
+            {
+                //SetOwnersExs("rem");
+                g_lOwners = llParseString2List(sValue, [","], []);
+                //send accepttp command
+                //SetOwnersExs("add");
+            }
+            else if (sToken == "secowners")
+            {
+                //SetOwnersExs("rem");
+                g_lSecOwners = llParseString2List(sValue, [","], []);
+                //send accepttp command
+                //SetOwnersExs("add");
+            }
             else if (sToken == "settings")
             {
                 if (sValue == "sent")
@@ -734,13 +765,13 @@ default
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
             //does soemthing here need to change?
-            if (sToken == "auth_owner")
+            if (sToken == "owner")
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
                 ClearEx();
                 UpdateSettings();
             }
-            else if (sToken == "auth_secowner")
+            else if (sToken == "secowners")
             {
                 g_lSecOwners = llParseString2List(sValue, [","], []);
                 //send accepttp command
@@ -750,7 +781,7 @@ default
         }
         else if (iNum == RLV_REFRESH)
         {
-            //rlvmain just started up. Tell it about our current restrictions
+            //rlvmain just started up.  Tell it about our current restrictions
             g_iRLVOn = TRUE;
             UpdateSettings();
         }
@@ -766,7 +797,7 @@ default
         {
             g_sDetectedRLVersion = sStr;
         }
-        else if (iNum == RLV_OFF) // rlvoff -> we have to turn the menu off too
+        else if (iNum == RLV_OFF)         // rlvoff -> we have to turn the menu off too
         {
             g_iRLVOn=FALSE;
         }
@@ -792,13 +823,19 @@ default
                 }
                 else if (sMessage == "Owner")
                 {
-                    //give menu for owners defaults
+                    //give menu of for owners defaults
                     ExMenu(kAv, "owner", iAuth);
                 }
-                else if (sMessage == "Secowner")
+                else if (sMessage == "Secowners")
                 {
-                    //give menu for secowners defaults
-                    ExMenu(kAv, "secowner", iAuth);
+                    //give menu of for secowners defaults
+                    ExMenu(kAv, "secowners", iAuth);
+                }
+                else if (sMessage == "Add")
+                {
+                    g_kDialoger = kAv;
+                    g_iDialogerAuth = iAuth;
+                    llSensor("", "", AGENT, 10.0, PI);
                 }
                 else if (sMessage == "Other") PersonMenu(kAv, g_lNames, "", iAuth);
             }
@@ -814,40 +851,113 @@ default
                 if (sMessage == UPMENU) Menu(kAv,"", iAuth);
                 else
                 {
-                    // clear out Tmp settings
-                    g_kTmpKey = NULL_KEY;
-                    g_sTmpName = g_sUserCommand = "";
                     string sMenu = llList2String(g_lExMenus, iMenuIndex + 1);
                     //we got a command to enable or disable something, like "Enable LM"
                     //get the actual command same by looking up the pretty name from the message
                     list lParams = llParseString2List(sMessage, [" "], []);
                     string sSwitch = llList2String(lParams, 0);
                     string sCmd = llList2String(lParams, 1);
-                    string sOut = "ex " + sMenu + ":";
                     integer iIndex = llListFindList(g_lPrettyCmds, [sCmd]);
                     if (sCmd == "All")
                     {
                         //handle the "Allow All" and "Forbid All" commands
-                        sOut += "all";
+                        string ONOFF;
                         //decide whether we need to switch to "y" or "n"
-                        if (sSwitch == TURNOFF) sOut += "=y"; // exempt
-                        else if (sSwitch == TURNON) sOut += "=n"; // enforce
+                        if (sSwitch == TURNOFF)
+                        {
+                            //enable all functions (ie, remove all restrictions
+                            ONOFF = "y";
+                        }
+                        else if (sSwitch == TURNON)
+                        {
+                            ONOFF = "n";
+                        }
+
+                        //loop through g_lRLVcmds to create list
+                        string sOut;
+                        integer n;
+                        integer iStop = llGetListLength(g_lRLVcmds);
+                        for (n = 0; n < iStop; n++)
+                        {
+                            string cmd1 = llList2String(g_lRLVcmds, n);
+                            //prefix all but the first value with a comma, so we have a comma-separated list
+                            if (n)
+                            {
+                                sOut += ",";
+                            }
+                            sOut +=  cmd1 + ":" + sMenu + "=" + ONOFF;
+                        }
+                        // I a deabating how to do this but I think it is best to make sure they cna set them so setting back to the old way
+                        /*
+                        integer iOut = 0;
+                        integer n;
+                        integer iStop = llGetListLength(g_lRLVcmds);
+                        if (ONOFF == "n")
+                        {
+                            for (n = 0; n < iStop; n++)
+                            {
+                                iOut = iOut | llList2Integer(g_lBinCmds, n);
+                            }
+                        }
+                        if (sMenu == "owner")
+                        {
+                            g_iOwnerDefault = iOut;
+                        }
+                        else if (sMenu == "secowners")
+                        {
+                            g_iSecOwnerDefault = iOut;
+                        }
+                        //need to put new change commands here
+                        SetAllExs("");
+                        */
                         UserCommand(iAuth, sOut, kAv);
                         ExMenu(kAv, sMenu, iAuth);
                     }
-                    else if (~iIndex)
+                    else if (iIndex != -1)
                     {
-                        sOut += llList2String(g_lRLVcmds, iIndex);
-                        if (sSwitch == TURNOFF) sOut += "=y"; // exempt
-                        else if (sSwitch == TURNON) sOut += "=n"; // enforce
+                        string sOut = llList2String(g_lRLVcmds, iIndex);
+                        sOut += ":" + sMenu + "=";
+                        if (sSwitch == TURNOFF)
+                        {
+                            //enable all functions (ie, remove all restrictions
+                            sOut += "y";
+                        }
+                        else if (sSwitch == TURNON)
+                        {
+                            sOut += "n";
+                        }
                         //send rlv command out through auth system as though it were a chat command, just to make sure person who said it has proper authority
-                        Debug("ExMenu sending UC: " + sOut);
                         UserCommand(iAuth, sOut, kAv);
                         ExMenu(kAv, sMenu, iAuth);
+                        /* thinking it is btter to switch back to the other way. It does mean more work for the script
+                        integer iOut = 0;
+                        if (sSwitch == TURNON)
+                        {
+                            iOut = llList2Integer(g_lBinCmds, iIndex);
+                        }
+                        else if (sSwitch == TURNOFF)
+                        {
+                            iOut = -llList2Integer(g_lBinCmds, iIndex);
+                        }
+                        if (sMenu == "owner")
+                        {
+                            g_iOwnerDefault = iOut + g_iOwnerDefault;
+                        }
+                        else if (sMenu == "secowners")
+                        {
+                            g_iSecOwnerDefault = iOut + g_iSecOwnerDefault;
+                        }
+                        // need a better way for this
+                        // new way
+                        SetAllExs("");
+                        */
+                        //send rlv command out through auth system as though it were a chat command, just to make sure person who said it has proper authority
+                        //llMessageLinked(LINK_SET, COMMAND_NOAUTH, sOut, kAv);
+                        //g_iReturnMenu = TRUE;
                     }
                     else if (sMessage == "Defaults")
                     {
-                        UserCommand(iAuth, sOut + "defaults", kAv);
+                        UserCommand(iAuth, "defaults:" + sMenu + "=force", kAv);
                         ExMenu(kAv, sMenu, iAuth);
                     }
                     else if (sMessage == "List")
@@ -856,14 +966,14 @@ default
                         {
                             PersonMenu(kAv, g_lOwners, "", iAuth);
                         }
-                        else if (sMenu == "secowner")
+                        else if (sMenu == "secowners")
                         {
                             PersonMenu(kAv, g_lSecOwners, "", iAuth);
                         }
                     }
                     else
                     {
-                        //something went horribly wrong. We got a command that we can't find in the list
+                        //something went horribly wrong.  We got a command that we can't find in the list
                     }
                     llDeleteSubList(g_lExMenus, iMenuIndex, iMenuIndex + 1);
                 }
@@ -877,10 +987,6 @@ default
                 integer iPage = (integer)llList2String(lMenuParams, 2);
                 integer iAuth = (integer)llList2String(lMenuParams, 3);
                 if (sMessage == UPMENU) Menu(kAv, "", iAuth);
-                else if (sMessage == "Add")
-                {
-                    FetchAvi(iAuth, "ex", "", kAv);
-                }
                 else
                 {
                     string sTmp = llList2String(g_lPersonMenu, (integer)sMessage*2-2); //g_lOwners + g_lSecOwners + g_lScan + g_lNames, llListFindList(g_lOwners + g_lSecOwners + g_lScan + g_lNames, [sMessage])-1);
@@ -888,42 +994,56 @@ default
                     //g_lScan = [];
                 }
             }
-        }
-        else if (iNum == FIND_AGENT)
-        {
-            if (kID != REQUEST_KEY) return;
-            list params = llParseString2List(sStr, ["|"], []);
-            if (llList2String(params, 0) != g_sScript) return;
-            g_kTmpKey = (key)llList2String(params, 2);
-            AddName(llList2String(params, 5));
+            else if(kID == g_kSensorMenuID)
+            {
+                Debug("dialog response: " + sStr);
+                list lMenuParams = llParseString2List(sStr, ["|"], []);
+                key kAv = (key)llList2String(lMenuParams, 0);
+                string sMessage = llList2String(lMenuParams, 1);
+                integer iPage = (integer)llList2String(lMenuParams, 2);
+                integer iAuth = (integer)llList2String(lMenuParams, 3);
+                if (sMessage == UPMENU) Menu(kAv, "", iAuth);
+                else
+                {
+                    string sTmp = llList2String(g_lOwners + g_lSecOwners + g_lScan + g_lNames, llListFindList(g_lOwners + g_lSecOwners + g_lScan + g_lNames, [sMessage])-1);
+                    ExMenu(kAv, sTmp, iAuth);
+                    g_lScan = [];
+                }
+            }
         }
     }
     dataserver(key kID, string sData)
     {
-        integer iIndex = llListFindList(g_lNames, [kID]);
-        if (~iIndex)
+        integer iIndex = llListFindList(g_lNames, [(string)kID]);
+        if (iIndex != -1)
         {
-            llSetTimerEvent(0);
             g_lNames = llListReplaceList(g_lNames, [sData], iIndex, iIndex);
-            if (g_sUserCommand != "") UserCommand(g_iAuth, g_sUserCommand, g_kTmpKey);
-            if (g_kTmpKey != NULL_KEY) Notify(g_kTmpKey, "Successfully added " + sData + " to exemptions user list.", FALSE);
-            g_iAuth = 0;
-            g_kTmpKey = g_kTestKey = NULL_KEY;
-            g_sTmpName = g_sUserCommand = "";
         }
-    }
-    timer() // RequestAgentData fail
+    }            
+    sensor(integer iNum_detected)
     {
-        llSetTimerEvent(0);
-        integer i = llListFindList(g_lNames, [g_kTestKey]);
-        string badkey = llList2String(g_lNames, i - 1);
-        g_lNames = llDeleteSubList(g_lNames, i - 1, i);
-        list temp = llDeleteSubList(llParseString2List(g_sUserCommand, [":"], []), 0, 1);
-        g_sUserCommand = llDumpList2String(temp, ":");
-        if (g_sUserCommand != "") UserCommand(g_iAuth, "ex " + g_sUserCommand, g_kTmpKey);
-        if (g_kTmpKey != NULL_KEY) Notify(g_kTmpKey, badkey + " is not a valid avatar uuid.", FALSE);
-        g_iAuth = 0;
-        g_kTmpKey = g_kTestKey = NULL_KEY;
-        g_sTmpName = g_sUserCommand = "";
+        list lButtons;
+        string sName;
+        integer i;
+        
+        for(i = 0; i < iNum_detected; i++)
+        {
+            sName = llDetectedName(i);
+            lButtons += [sName];
+            g_lScan += [(string)llDetectedKey(i) ,sName];
+        }
+        //add wearer if not already in button list
+        if (llGetListLength(lButtons) > 0)
+        {
+            string sText = "Select who you would like to add.\nIf the one you want to add does not show, move closer and repeat or use the chat command.";
+            g_kSensorMenuID = Dialog(g_kDialoger, sText, lButtons, [UPMENU], 0, g_iDialogerAuth);
+        }
+        //llOwnerSay((string)llGetFreeMemory());
+    }
+
+    no_sensor()
+    {
+        Notify(g_kDialoger, "Nobody is in 10m range to be shown, either move closer or use the chat command to add someone who is not with you at this moment or offline.",FALSE);
+  
     }
 }

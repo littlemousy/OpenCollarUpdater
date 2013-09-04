@@ -1,5 +1,4 @@
-﻿//OpenCollar - rlvmain
-
+//OpenCollar - rlvmain
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 //new viewer checking method, as of 2.73
 //on rez, restart script
@@ -75,9 +74,8 @@ string UPMENU = "^";
 string TURNON = "*Turn On*";
 string TURNOFF = "*Turn Off*";
 string CLEAR = "*Clear All*";
-string CTYPE = "collar";
+
 key g_kWearer;
-string g_sScript;
 
 integer g_iLastDetach; //unix time of the last detach: used for checking if the detached time was small enough for not triggering the ping mechanism
 
@@ -87,17 +85,12 @@ Debug(string sStr)
     //llOwnerSay(llGetScriptName() + ": " + sStr);
 }
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
-    }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    } else {
+            llInstantMessage(kID,sMsg);
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -134,7 +127,7 @@ DoMenu(key kID, integer iAuth)
     }
 
     string sPrompt = "Restrained Love Viewer Options.";
-    if (g_iRlvVersion) sPrompt += "\nDetected version of RLVÂ API: "+(string)g_iRlvVersion;
+    if (g_iRlvVersion) sPrompt += "\nDetected version of RLV API: "+(string)g_iRlvVersion;
     kMenuID = Dialog(kID, sPrompt, lButtons, [UPMENU], 0, iAuth);
 }
 
@@ -218,11 +211,11 @@ AddRestriction(key kID, string sBehav)
     }
     else
     {
-        list lSrcRestr = llParseString2List(llList2String(g_lRestrictions,iSource),["§"],[]);
+        list lSrcRestr = llParseString2List(llList2String(g_lRestrictions,iSource),["/"],[]);
         iRestr=llListFindList(lSrcRestr, [sBehav]);
         if (iRestr==-1)
         {
-            g_lRestrictions=llListReplaceList(g_lRestrictions,[llDumpList2String(lSrcRestr+[sBehav],"§")],iSource, iSource);
+            g_lRestrictions=llListReplaceList(g_lRestrictions,[llDumpList2String(lSrcRestr+[sBehav],"/")],iSource, iSource);
         }
     }
     if (iRestr==-1)
@@ -254,7 +247,7 @@ RemRestriction(key kID, string sBehav)
     integer iRestr;
     if (iSource!=-1)
     {
-        list lSrcRestr = llParseString2List(llList2String(g_lRestrictions,iSource),["§"],[]);
+        list lSrcRestr = llParseString2List(llList2String(g_lRestrictions,iSource),["/"],[]);
         iRestr=llListFindList(lSrcRestr,[sBehav]);
         if (iRestr!=-1)
         {
@@ -267,7 +260,7 @@ RemRestriction(key kID, string sBehav)
             else
             {
                 lSrcRestr=llDeleteSubList(lSrcRestr,iRestr,iRestr);
-                g_lRestrictions=llListReplaceList(g_lRestrictions,[llDumpList2String(lSrcRestr,"§")] ,iSource,iSource);
+                g_lRestrictions=llListReplaceList(g_lRestrictions,[llDumpList2String(lSrcRestr,"/")] ,iSource,iSource);
             }
             if (sBehav=="unsit"&&g_kSitter==kID)
             {
@@ -291,13 +284,13 @@ ApplyRem(string sBehav)
         integer iFound=FALSE;
         for (i=0;i<=llGetListLength(g_lRestrictions);i++)
         {
-            list lSrcRestr=llParseString2List(llList2String(g_lRestrictions,i),["§"],[]);
+            list lSrcRestr=llParseString2List(llList2String(g_lRestrictions,i),["/"],[]);
             if (llListFindList(lSrcRestr, [sBehav])!=-1) iFound=TRUE;
         }
         if (!iFound)
         {
             g_lBaked=llDeleteSubList(g_lBaked,iRestr,iRestr);
-            //if (sBehav!="no_hax")  removed:Â issue 1040
+            //if (sBehav!="no_hax")  removed: issue 1040
             SendCommand(sBehav+"=y");
         }
     }
@@ -308,7 +301,7 @@ Release(key kID, string sPattern)
 {
     integer iSource=llListFindList(g_lSources,[kID]);
     if (iSource!=-1) {
-        list lSrcRestr=llParseString2List(llList2String(g_lRestrictions,iSource),["§"],[]);
+        list lSrcRestr=llParseString2List(llList2String(g_lRestrictions,iSource),["/"],[]);
         integer i;
         if (sPattern!="") {
             for (i=0;i<=llGetListLength(lSrcRestr);i++) {
@@ -353,6 +346,9 @@ SafeWord(integer iCollarToo) {
 
 integer UserCommand(integer iNum, string sStr, key kID)
 {
+    // SA: TODO delete this when transition is finished
+    if (iNum == COMMAND_NOAUTH) {llMessageLinked(LINK_SET, iNum, sStr, kID); return TRUE;}
+    // /SA
     if (iNum == COMMAND_EVERYONE) return TRUE;  // No command for people with no privilege in this plugin.
     else if (iNum > COMMAND_EVERYONE || iNum < COMMAND_OWNER) return FALSE; // sanity check
     list lParams = llParseString2List(sStr, [" "], []);
@@ -368,7 +364,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
     }
     else if (sStr == "rlvon")
     {
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "on=1", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, "rlvon=1", NULL_KEY);
         g_iRLVOn = TRUE;
         g_iVerbose = TRUE;
         if (TRUE) state default;
@@ -379,12 +375,12 @@ integer UserCommand(integer iNum, string sStr, key kID)
         if (sOnOff == "on")
         {
             g_iRLVNotify = TRUE;
-            llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "notify=1", NULL_KEY);
+            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "rlvnotify=1", NULL_KEY);
         }
         else if (sOnOff == "off")
         {
             g_iRLVNotify = FALSE;
-            llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "notify=0", NULL_KEY);
+            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "rlvnotify=0", NULL_KEY);
         }
     }
     else if (!g_iRLVOn || !g_iViewerCheck) return TRUE;
@@ -403,7 +399,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
     }
     else if (sStr == "rlvon")
     {
-        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "on=1", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, "rlvon=1", NULL_KEY);
         g_iRLVOn = TRUE;
         g_iVerbose = TRUE;
         if (TRUE) state default;
@@ -413,7 +409,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
         if (iNum == COMMAND_OWNER)
         {
             g_iRLVOn = FALSE;
-            llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sScript + "on=0", NULL_KEY);
+            llMessageLinked(LINK_SET, LM_SETTING_SAVE, "rlvon=0", NULL_KEY);
             SafeWord(TRUE);
             llMessageLinked(LINK_SET, RLV_OFF, "", NULL_KEY);
         }
@@ -427,7 +423,7 @@ integer UserCommand(integer iNum, string sStr, key kID)
         integer i;
         for (i=0;i<llGetListLength(g_lSources);i++)
             if (llList2String(g_lSources,i)!=NULL_KEY) sOut+="\n"+llKey2Name((key)llList2String(g_lSources,i))+" ("+llList2String(g_lSources,i)+"): "+llList2String(g_lRestrictions,i);
-        else sOut+="\nThis " + CTYPE + ": "+llList2String(g_lRestrictions,i);
+        else sOut+="\nThis collar: "+llList2String(g_lRestrictions,i);
         Notify(kID,sOut,FALSE);
     }
     return TRUE;
@@ -435,13 +431,11 @@ integer UserCommand(integer iNum, string sStr, key kID)
 
 
 default{
-    state_entry()
-    {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
+    state_entry() {
         g_kWearer = llGetOwner();
         //request setting from DB
         llSleep(1.0);
-        llMessageLinked(LINK_SET, LM_SETTING_REQUEST, g_sScript + "on", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_REQUEST, "rlvon", NULL_KEY);
         // Ensure that menu script knows we're here.
         llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
     }
@@ -454,7 +448,7 @@ default{
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+            if(sToken == "owner" && llStringLength(sValue) > 0)
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
                 Debug("owners: " + sValue);
@@ -465,39 +459,39 @@ default{
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
             string sValue = llList2String(lParams, 1);
-            integer i = llSubStringIndex(sToken, "_");
-            if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+            if(sToken == "owner" && llStringLength(sValue) > 0)
             {
                 g_lOwners = llParseString2List(sValue, [","], []);
                 Debug("owners: " + sValue);
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
-            else if (llGetSubString(sToken, 0, i) == g_sScript)
+            else if (sStr == "rlvon=0")
+            {//RLV is turned off in DB.  just switch to checked state without checking viewer
+                //llOwnerSay("rlvdb false");
+                state checked;
+                llMessageLinked(LINK_SET, RLV_OFF, "", NULL_KEY);
+
+            }
+            else if (sStr == "rlvon=1")
+            {//DB says we were running RLV last time it looked.  do @versionnum to check.
+                //llOwnerSay("rlvdb true");
+                g_iRLVOn = TRUE;
+                //check viewer version
+                CheckVersion(FALSE);
+            }
+            else if (sStr == "rlvnotify=1")
             {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "on")
-                {
-                    if (sValue == "unset") CheckVersion(FALSE);
-                    else if (!(integer)sValue)
-                    {
-                        //RLV is turned off in DB.  just switch to checked state without checking viewer
-                        //llOwnerSay("rlvdb false");
-                        state checked;
-                        llMessageLinked(LINK_SET, RLV_OFF, "", NULL_KEY);
-                    }
-                    else
-                    {
-                        //DB says we were running RLV last time it looked.  do @versionnum to check.
-                        //llOwnerSay("rlvdb true");
-                        g_iRLVOn = TRUE;
-                        //check viewer version
-                        CheckVersion(FALSE);
-                    }
-                }
-                else if (sToken == "notify") g_iRLVNotify = (integer)sValue;
+                g_iRLVNotify = TRUE;
+            }
+            else if (sStr == "rlvnotify=0")
+            {
+                g_iRLVNotify = FALSE;
+            }
+            else if (sStr == "rlvon=unset")
+            {
+                CheckVersion(FALSE);
             }
         }
-        else if ((iNum == LM_SETTING_EMPTY && sStr == g_sScript + "on"))
+        else if ((iNum == LM_SETTING_EMPTY && sStr == "rlvon"))
         {
             CheckVersion(FALSE);
         }
@@ -732,12 +726,11 @@ state checked {
                 llMessageLinked(LINK_SET, RLV_CLEAR, "", NULL_KEY);
                 SafeWord(TRUE);
             }
-            else if (iNum == LM_SETTING_SAVE)
-            {
+            else if (iNum == LM_SETTING_SAVE) {
                 list lParams = llParseString2List(sStr, ["="], []);
                 string sToken = llList2String(lParams, 0);
                 string sValue = llList2String(lParams, 1);
-                if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+                if(sToken == "owner" && llStringLength(sValue) > 0)
                 {
                     g_lOwners = llParseString2List(sValue, [","], []);
                     Debug("owners: " + sValue);
@@ -748,16 +741,18 @@ state checked {
                 list lParams = llParseString2List(sStr, ["="], []);
                 string sToken = llList2String(lParams, 0);
                 string sValue = llList2String(lParams, 1);
-                integer i = llSubStringIndex(sToken, "_");
-                if(sToken == "auth_owner" && llStringLength(sValue) > 0)
+                if(sToken == "owner" && llStringLength(sValue) > 0)
                 {
                     g_lOwners = llParseString2List(sValue, [","], []);
                     Debug("owners: " + sValue);
                 }
-                else if (llGetSubString(sToken, 0, i) == g_sScript)
+                else if (sStr == "rlvnotify=1")
                 {
-                    sToken = llGetSubString(sToken, i + 1, -1);
-                    if (sToken == "notify") g_iRLVNotify = (integer)sValue;
+                    g_iRLVNotify = TRUE;
+                }
+                else if (sStr == "rlvnotify=0")
+                {
+                    g_iRLVNotify = FALSE;
                 }
             }
             else if (iNum==COMMAND_RELAY_SAFEWORD)

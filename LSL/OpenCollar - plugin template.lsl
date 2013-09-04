@@ -1,5 +1,5 @@
 // Template for creating a OpenCollar Plugin
-// API Version: 3.9
+// API Version: 3.8
 
 // Licensed under the GPLv2, with the additional requirement that these scripts
 // remain "full perms" in Second Life.  See "OpenCollar License" for details.
@@ -14,8 +14,6 @@ integer IN_DEBUG_MODE               = FALSE;    // set to TRUE to enable Debug m
 
 key     g_kMenuID;                              // menu handler
 key     g_kWearer;                              // key of the current wearer to reset only on owner changes
-string  g_sScript;                              // part of script name used for settings
-string CTYPE                         = "collar";    // designer can set in notecard to appropriate word for their item        
 
  // any local, not changing buttons which will be used in this plugin, leave empty or add buttons as you like:
 list    PLUGIN_BUTTONS              = ["Command 1", "Command 2", "AuthCommand"];
@@ -83,9 +81,6 @@ integer DIALOG                     = -9000;
 integer DIALOG_RESPONSE            = -9001;
 integer DIALOG_TIMEOUT             = -9002;
 
-integer FIND_AGENT                   = -9005; // to look for agent(s) in region with a (optional) search string
-key REQUEST_KEY;
-
 integer TIMER_EVENT                = -10000; // str = "start" or "end". For start, either "online" or "realtime".
 
 integer UPDATE                     = 10001;  // for child prim scripts (currently none in 3.8, thanks to LSL new functions)
@@ -137,17 +132,14 @@ Debug(string sMsg) {
 //=
 //===============================================================================
 
-Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
-{
-    if (kID == g_kWearer)
-    {
+Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
+    if (kID == g_kWearer) {
         llOwnerSay(sMsg);
     }
-    else
-    {
-        llInstantMessage(kID, sMsg);
-        if (iAlsoNotifyWearer)
-        {
+    else {
+        llInstantMessage(kID, sMsg); // llRegionSayTo(key id, integer channel, string message) instead of llInstantMessage
+				     // is also possible if you do not need to notify people in other regions
+        if (iAlsoNotifyWearer) {
             llOwnerSay(sMsg);
         }
     }
@@ -169,10 +161,10 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
     key kID = llGenerateKey();
-    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|"
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
     + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
-}
+} 
 
 //===============================================================================
 //= parameters   :    string    keyID   key of person requesting the menu
@@ -194,27 +186,19 @@ DoMenu(key keyID, integer iAuth) {
     g_kMenuID = Dialog(keyID, sPrompt, lMyButtons, [UPMENU], 0, iAuth);
 }
 
+
 //===============================================================================
-//= parameters   :    auth: integer (avatar auth level)
-//=                      type: string; user-defined label; what to do with result
-//=                      name: search string (optional) full or partial name to seek
-//=                      user: key; Requesting Agent (menu user / chat commander)
+//= parameters   :    none
 //=
-//= return        :    none
+//= return        :   string     DB prefix from the description of the collar
 //=
-//= description  :    request agent key, searching in region, with name as criteria
+//= description  :    prefix from the description of the collar
 //=
 //===============================================================================
-FetchAvi(integer auth, string type, string name, key user)
-{
-    if (name == "") name = " "; // getavi requires a value here - blank will search with no string
-    string out = llDumpList2String(["getavi_", g_sScript, user, auth, type, name], "|");
-    // sometimes, you want to exclude possible finds, such as if they exist in a list you are adding to
-    // do not search for these names (can be partial string)
-    list exclude = ["source list"];
-    if (llGetListLength(exclude))
-        out += "|" + llDumpList2String(exclude, ",");
-    llMessageLinked(LINK_THIS, FIND_AGENT, out, REQUEST_KEY = llGenerateKey());
+
+string GetDBPrefix() {
+    // get settings store prefix from list in object desc
+    return llList2String(llParseString2List(llGetObjectDesc(), ["~"], []), 2);
 }
 
 //===============================================================================
@@ -254,10 +238,10 @@ integer UserCommand(integer iNum, string sStr, key kID) {
         Debug("Do some fancy stuff to impress the user");
 
         // maybe save a value to the setting store:
-        llMessageLinked(LINK_THIS, LM_SETTING_SAVE, g_sScript + "token=value", NULL_KEY);
+        llMessageLinked(LINK_THIS, LM_SETTING_SAVE, "token=value", NULL_KEY);
 
         // or delete a toke from the setting store:
-        llMessageLinked(LINK_THIS, LM_SETTING_DELETE, g_sScript + "token", NULL_KEY);
+        llMessageLinked(LINK_THIS, LM_SETTING_DELETE, "token", NULL_KEY);                
     }
     return TRUE;
 }
@@ -265,10 +249,8 @@ integer UserCommand(integer iNum, string sStr, key kID) {
 
 
 default {
-
-    state_entry()
-    {
-        g_sScript = llStringTrim(llList2String(llParseString2List(llGetScriptName(), ["-"], []), 1), STRING_TRIM) + "_";
+    
+    state_entry() {
         // store key of wearer
         g_kWearer = llGetOwner();
         // sleep a second to allow all scripts to be initialized
@@ -280,7 +262,7 @@ default {
 
     // Reset the script if wearer changes. By only reseting on owner change we can keep most of our
     // configuration in the script itself as global variables, so that we don't loose anything in case
-    // the settings store isn't available, and also keep settings that were not sent to that store
+    // the settings store isn't available, and also keep settings that were not sent to that store 
     // in the first place.
     // Cleo: As per Nan this should be a reset on every rez, this has to be handled as needed, but be prepared that the user can reset your script anytime using the OC menus
     on_rez(integer iParam) {
@@ -308,8 +290,7 @@ default {
                 }
             }
         }
-        else if (iNum == LM_SETTING_RESPONSE)
-        {
+        else if (iNum == LM_SETTING_RESPONSE) {
             // response from setting store have been received
             // pares the answer
             list lParams = llParseString2List(sStr, ["="], []);
@@ -317,35 +298,27 @@ default {
             string sValue = llList2String(lParams, 1);
             // and check if any values for use are received
             // replace "value1" by your own token
-            integer i = llSubStringIndex(sToken, "_");
-            if (llGetSubString(sToken, 0, i) == g_sScript)
-            {
-                sToken = llGetSubString(sToken, i + 1, -1);
-                if (sToken == "value1" )
-                {
-                    // work with the received values
-                }
-                // replace "value2" by your own token, but if possible try to store everything in one token
-                // to reduce the load on the setting store (especially if it is implemented as a webservice... )
-                else if (sToken == "value2")
-                {
-                    // work with the received values
-                }
+            
+            if (sToken == "value1" ) {
+                // work with the received values
             }
-            // or check for specific values from the collar like "auth_owner" (for owners) "auth_secowner" (for secondary owners) etc
-            else if (sToken == "auth_owner")
-            {
+            // replace "value2" by your own token, but if possible try to store everything in one token
+            // to reduce the load on the setting store (especially if it is implemented as a webservice... )
+            else if (sToken == "value2") {
+                // work with the received values
+            }
+            // or check for specific values from the collar like "owner" (for owners) "secowners" (or secondary owners) etc
+            else if (sToken == "owner") {
                 // work with the received values, in this case pare the vlaue into a strided list with the owners
                 list lOwners = llParseString2List(sValue, [","], []);
             }
-            else if (sToken == "Global_CType") CTYPE = sValue;
         }
         else if (UserCommand(iNum, sStr, kID)) {
             // do nothing more if TRUE
         }
         else if (iNum == COMMAND_EVERYONE) {
             // you might want to react on unauthorized users or such, see message map on the top of the script, please remove if not needed
-            Debug("Go away and get your own sub, you have no right on this " + CTYPE + "");
+            Debug("Go away and get your own sub, you have no right on this collar");
         }
         else if (iNum == COMMAND_SAFEWORD) {
             // Safeword has been received, release any restricitions that should be released
@@ -403,20 +376,6 @@ default {
                 Debug("The user was to slow or lazy, we got a timeout!");
             }
         }
-        else if (iNum == FIND_AGENT)
-        {
-            if (kID != REQUEST_KEY) return; // if we didn't request it, we won't know what to do with it
-            list params = llParseString2List(sStr, ["|"], []);
-            if (llList2String(params, 0) != g_sScript) return; // not sent to us
-            key kUser = (key)llList2String(params, 2); // requesting user key, for Notify or more menus
-            integer iAuth = (integer)llList2String(params, 3); // auth level of user
-            string sType = llList2String(params, 4); // we sent this string as an identifier for what to do with the result
-            key kNew = (key)llList2String(params, 5); // this is the key for whatever agent we picked by name
-            if (sType == "our type identifier")
-            {    // examples
-                // g_lMyList += [kNew];
-                // Notify(kUser, "I think " + llKey2Name(kNew) + " likes you", FALSE);
-            }
-        }
     }
+
 }
