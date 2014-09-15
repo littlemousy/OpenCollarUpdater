@@ -200,6 +200,8 @@ integer LeashTo(key kTarget, key kCmdGiver, integer iAuth, list lPoints, integer
         return FALSE;
     }
     
+    if (g_kLeashedTo==kTarget) return TRUE; //prevent grabby post from re-leashing and therefore changing leasher's ID'
+    
     if (g_kLeashedTo){
         DoUnleash();
     }
